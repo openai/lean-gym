@@ -39,6 +39,17 @@ meta def get_tsd_at_decl (decl_nm : name) : tactic tactic_state_data := do {
   get_tsd_with_main_goal decl.type
 }
 
+private meta def set_bool_option2 (n : name) (v : bool) : tactic unit :=                                
+do s ← tactic.read,                                                                                    
+   tactic.write $ tactic_state.set_options s (options.set_bool (tactic_state.get_options s) n v)       
+                                                                                                       
+private meta def enable_full_names : tactic unit := do {                                               
+  set_bool_option2 `pp.full_names true                                                                  
+}                                                                                                      
+                                                                                                       
+private meta def with_full_names {α} (tac : tactic α) : tactic α :=                                    
+tactic.save_options $ enable_full_names *> tac   
+
 end 
 
 
@@ -88,7 +99,11 @@ do {
 
     rebuild_tactic_state tsd,
     decl_goal_string ← format.to_string <$> (tactic.target >>= tactic.pp),
-    tactic.trace format!">> {decl_goal_string}"
+    tactic.trace format!">> {decl_goal_string}",
+
+    result ← with_full_names $ (tactic.read >>= λ ts, pure ts.to_format.to_string),
+    tactic.trace format!">> {result}"
+    
   },
 
   io.run_tactic' $ tactic.set_env_core env₀,
