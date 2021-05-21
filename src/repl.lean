@@ -39,12 +39,6 @@ meta def get_tsd_at_decl (decl_nm : name) : tactic tactic_state_data := do {
   get_tsd_with_main_goal decl.type
 }
 
-meta def add_open_namespace : name → tactic unit := λ nm, do
-env ← tactic.get_env, tactic.set_env (env.execute_open nm)
-
-meta def add_open_namespaces (nms : list name) : tactic unit :=
-nms.mmap' add_open_namespace
-
 end 
 
 

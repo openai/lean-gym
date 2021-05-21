@@ -25,3 +25,14 @@ meta def set_env_at_decl (decl_nm : name) : tactic unit := do {
 }
 
 end set_env_at_decl
+
+
+section add_open_namespace
+
+meta def add_open_namespace : name → tactic unit := λ nm, do
+env ← tactic.get_env, tactic.set_env (env.execute_open nm)
+
+meta def add_open_namespaces (nms : list name) : tactic unit :=
+nms.mmap' add_open_namespace
+
+end add_open_namespace
