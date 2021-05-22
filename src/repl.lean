@@ -4,7 +4,6 @@ import data.string.basic
 import all
 import util.io
 import util.tactic
-import .tactic_state
 
 open tactic
 
@@ -22,29 +21,25 @@ do lean.parser.run_with_input (many ident) open_ns
 meta def mk_tactic_state : tactic tactic_state :=
 tactic.unsafe_run_io $ io.run_tactic' $ tactic.exact `(trivial) *> tactic.read
 
-meta def get_tsd_with_main_goal (tgt : expr) : tactic tactic_state_data := do {
+meta def get_ts_with_main_goal (tgt : expr) : tactic tactic_state := do {
   ts₀ ← tactic.read,
   mk_tactic_state >>= tactic.write,
   tactic.set_goal_to tgt,
-  tsd ← tactic_state_data.get,
+  ts ← tactic.read,
   tactic.write ts₀,
-  pure tsd
+  pure ts
 }
 
 /-- creates tactic_state_data as if we were proving the declaration
  (currently only theorems are supported) with name `decl_nm`. -/
-meta def get_tsd_at_decl (decl_nm : name) : tactic tactic_state_data := do {
+meta def get_ts_at_decl (decl_nm : name) : tactic tactic_state := do {
   env ← tactic.get_env,
   decl ← env.get decl_nm,
-  get_tsd_with_main_goal decl.type
+  get_ts_with_main_goal decl.type
 }
 
-private meta def set_bool_option2 (n : name) (v : bool) : tactic unit :=                                
-do s ← tactic.read,                                                                                    
-   tactic.write $ tactic_state.set_options s (options.set_bool (tactic_state.get_options s) n v)       
-                                                                                                       
 private meta def enable_full_names : tactic unit := do {                                               
-  set_bool_option2 `pp.full_names true                                                                  
+  set_bool_option `pp.full_names true                                                                  
 }                                                                                                      
                                                                                                        
 private meta def with_full_names {α} (tac : tactic α) : tactic α :=                                    
@@ -88,19 +83,20 @@ do {
   env₀ ← io.run_tactic' $ tactic.get_env,
 
   io.run_tactic' $ do {
-    tsd ← get_tsd_at_decl th_name,
+    ts ← get_ts_at_decl th_name,
     tactic.trace format!"[repl] GOT TSD AT DECL {th_name}",
     env ← get_env_at_decl th_name,
     tactic.trace format!"[repl] GOT ENV AT DECL {th_name}",
     tactic.set_env_core env,
     tactic.trace format!"[repl] SET ENV AT DECL {th_name}",
+
     add_open_namespaces open_ns,
     tactic.trace format!"[repl] ADDED OPEN NAMESPACES {open_ns}",
 
-    rebuild_tactic_state tsd,
-    decl_goal_string ← format.to_string <$> (tactic.target >>= tactic.pp),
-    tactic.trace format!">> {decl_goal_string}",
+    tactic.write ts,
 
+    -- decl_goal_string ← format.to_string <$> (tactic.get_goals >>= tactic.pp),
+    -- tactic.trace format!">> {decl_goal_string}",
     result ← with_full_names $ (tactic.read >>= λ ts, pure ts.to_format.to_string),
     tactic.trace format!">> {result}"
     
