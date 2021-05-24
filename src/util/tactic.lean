@@ -2,6 +2,7 @@ import tactic
 import tactic.core
 import util.io
 import system.io
+import basic.control
 
 open tactic
 
@@ -38,13 +39,6 @@ meta def get_ts_at_decl (decl_nm : name) : tactic tactic_state := do {
   get_ts_with_main_goal decl.type
 }
 
-meta def enable_full_names : tactic unit := do {                                               
-  set_bool_option `pp.full_names true                                                                  
-}                                                                                                      
-                                                                                                       
-meta def with_full_names {α} (tac : tactic α) : tactic α :=                                    
-tactic.save_options $ enable_full_names *> tac   
-
 end
 
 
@@ -77,50 +71,8 @@ nms.mmap' add_open_namespace
 end add_open_namespace
 
 
-section run_with_state'
-
-namespace interaction_monad
-open interaction_monad.result
-meta def run_with_state' {σ₁ σ₂ : Type} {α : Type*} (state : σ₁) (tac : interaction_monad σ₁ α) : interaction_monad σ₂ α :=
-λ s, match (tac state) with
-     | (success val _) := success val s
-     | (exception fn pos _) := exception fn pos s
-     end
-end interaction_monad
-end run_with_state'
-
-namespace tactic
-
-open interaction_monad.result
-meta def run (tac : tactic unit) : tactic (interaction_monad.result tactic_state unit) := do {
-  σ ← get_state,
-  match tac σ with
-  | r@(success _ new_state) := interaction_monad.set_state new_state *> pure r
-  | r@(exception fn pos new_state) := pure r
-  end
-}
-
--- meta instance has_format_result {α σ} [has_to_format σ] [has_to_format α] : has_to_format (interaction_monad.result σ α) := ⟨by mk_to_format `interaction_monad.result⟩ -- ayyy
-
-meta instance has_to_format_tactic_result {α : Type*} [has_to_format α] : has_to_format (interaction_monad.result tactic_state α) :=
-⟨λ r,
-  match r with
-  | (success val new_state) := format!"SUCCESS!\nNEW_STATE: {new_state}\nVAL: {val}"
-  | (exception fn pos old_state) := do {
-    let msg := (fn.get_or_else (λ _, format.of_string "n/a")) (),
-    format!"EXCEPTION!\nMSG: {msg}\nPOS: {pos}\nOLD_STATE: {old_state}"
-  }
-  end
-⟩
-
-meta instance has_to_tactic_format_tactic_result {α : Type*} [has_to_format α] : has_to_tactic_format (interaction_monad.result tactic_state α) :=
-⟨λ σ, pure $ has_to_format.to_format σ⟩
-
-end tactic
-
-
-
 section parse_eval_tac
+
 setup_tactic_parser
 open tactic
 
@@ -135,3 +87,17 @@ meta def parse_eval_tac
 }
 
 end parse_eval_tac
+
+
+section hashing
+
+meta def tactic_hash : tactic ℕ := do {                                                                 
+  gs ← tactic.get_goals,                                                                                
+  hs ← gs.mmap $ λ g, do {                                                                              
+    tactic.set_goal_to g,                                                                               
+    es ← (::) <$> tactic.target <*> tactic.local_context,                                               
+    pure $ es.foldl (λ acc e, acc + e.hash) 0},                                                         
+  pure $ hs.sum                                                                                         
+}         
+
+end hashing
