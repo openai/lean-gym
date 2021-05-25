@@ -12,12 +12,18 @@ leanpkg configure && leanproject get-mathlib-cache && leanpkg build
 ## Usage
 
 ```bash
-lean --run src/repl.lean intermediate_field.adjoin.range_algebra_map_subset "intermediate_field intermediate_field finite_dimensional polynomial"
+lean --run src/repl.lean \
+    intermediate_field.adjoin.range_algebra_map_subset \
+    "intermediate_field intermediate_field finite_dimensional polynomial"
 ```
 
-Starts the REPL setting the environment and tactic state at declaration `intermediate_field.adjoin.range_algebra_map_subset` opening the namespaces passed as second argument.
+Starts the REPL setting the environment and tactic state at declaration
+`intermediate_field.adjoin.range_algebra_map_subset` opening the namespaces
+passed as second argument.
 
-Once started a `REPLState: string -> tactic_state` is maintained storing all the tactic states visited. The `REPLState` is initialized with the initial tactic state which is returned at initialization:
+Once started a `REPLState: string -> tactic_state` is maintained storing all the
+tactic states visited. The `REPLState` is initialized with the initial tactic
+state which is returned at initialization:
 
 ```
 $ lean --run src/repl.lean nat.prime_iff_prime_int ""
@@ -26,7 +32,9 @@ $ lean --run src/repl.lean nat.prime_iff_prime_int ""
 [end]
 ```
 
-The `run_tac` command applies a tactic string to the tactic state denoted by the provided identifier. A new tactic state (with identifier) is returned on succes, an error message otherwise.
+The `run_tac` command applies a tactic string to the tactic state denoted by the
+provided identifier. A new tactic state (with identifier) is returned on succes,
+an error message otherwise.
 
 ```
 $ lean --run src/repl.lean int.prime.dvd_mul ""      
