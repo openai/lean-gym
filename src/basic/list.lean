@@ -1,4 +1,5 @@
 /- Author: E.W.Ayers © 2019.
+Copied from the lean-tpe projcet: https://github.com/jesse-michael-han/lean-tpe-public
 
 Some additional helpers for working with lists.
 I suspect that I have duplicated some functionality here.

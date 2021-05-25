@@ -1,3 +1,11 @@
+/-
+Copyright (c) 2021 OpenAI. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Author(s): Stanislas Polu
+
+Helper functions to work with the io monad.
+-/
+
 import system.io
 import tactic.gptf.utils.util
 

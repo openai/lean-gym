@@ -1,3 +1,10 @@
+/-
+Copyright (c) 2021 OpenAI. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Author(s): Stanislas Polu
+
+REPL implementation to interact with Lean through stdio at a specific declaration.
+-/
 import tactic
 import control.traversable.derive
 import data.string.basic
@@ -18,6 +25,14 @@ meta structure LeanREPLRequest : Type :=
 (id : string)
 (payload : string)
 
+meta structure LeanREPLResponse : Type :=
+(id : option string)
+(tactic_state : option string)
+(error: option string)
+
+meta structure LeanREPLState : Type :=
+(state: dict string tactic_state)
+
 
 meta instance : has_from_json LeanREPLRequest := ⟨λ msg, match msg with
   | (json.array [json.of_string cmd, json.of_string id, json.of_string payload]) := pure ⟨cmd, id, payload⟩
@@ -28,21 +43,27 @@ meta instance : has_from_json LeanREPLRequest := ⟨λ msg, match msg with
 -- meta instance : has_to_format LeanREPLRequest :=
 --   ⟨λ ⟨cmd, id, payload⟩, format! "LeanREPLRequest: cmd={cmd} id={id} payload={payload}"⟩
 
-
-meta structure LeanREPLResponse : Type :=
-(id : option string)
-(tactic_state : option string)
-(error: option string)
-
-meta structure LeanREPLState : Type :=
-(state: dict string tactic_state)
-
-
 meta def record_ts (state: LeanREPLState) (ts : tactic_state) (hash: ℕ) : (string × LeanREPLState) := do {
   let id := (format! "{hash}").to_string,
   let new_state := (dict.insert id ts state.1),
   ⟨id, ⟨new_state⟩⟩ 
 }
+
+meta instance : has_to_format LeanREPLResponse :=
+  ⟨λ ⟨id, ts, err⟩, do {
+    match id with
+    | (some id) := match ts with
+      | (some ts) := format!"[success] {id}\n{ts}\n[end]"
+      | (none) := format!"[error] unexpected_undefined_ts\n[end]"
+      end
+    | none := do {
+      match err with
+      | some err := format!"[error] {err}\n[end]"
+      | none := format!"[error] unexpected_undefined_error\n[end]"
+      end
+    }
+    end
+  }⟩ 
 
 
 meta def init
@@ -67,24 +88,6 @@ meta def init
     pure r
   }
 
-meta instance : has_to_format LeanREPLResponse :=
-  ⟨λ ⟨id, ts, err⟩, do {
-    match id with
-    | (some id) := match ts with
-      | (some ts) := format!"[success] {id}\n{ts}\n[end]"
-      | (none) := format!"[error] unexpected_undefined_ts\n[end]"
-      end
-    | none := do {
-      match err with
-      | some err := format!"[error] {err}\n[end]"
-      | none := format!"[error] unexpected_undefined_error\n[end]"
-      end
-    }
-    end
-  }⟩ 
-
-
--- meta def handle_info (req : LeanREPLRequest) : io LeanREPLResponse := sorry
 
 meta def handle_run_tac
   (σ: LeanREPLState)
@@ -108,7 +111,7 @@ meta def handle_run_tac
         | interaction_monad.result.success s ts' := do {
           tactic.write ts',
           h ← tactic_hash,
-          tactic.trace format! "RECEIVED STRING {s}",
+          -- tactic.trace format! "RECEIVED STRING {s}",
           let rs := (record_ts σ ts' h), 
           let r : (LeanREPLState × LeanREPLResponse) := ⟨ rs.2, ⟨ some rs.1, some ts'.to_format.to_string, none ⟩ ⟩,
           pure r
@@ -148,12 +151,14 @@ do lean.parser.run_with_input ident nm
 meta def parse_open_namespace (open_ns: string) : tactic (list name) :=
 do lean.parser.run_with_input (many ident) open_ns 
 
+
 meta def loop: LeanREPLState → io unit := λ σ, do {
     req ← io.get_line >>= parse_request,
     ⟨σ', res⟩ ← handle_request σ req,
     has_to_format.to_format <$> pure res >>= io.put_str_ln',
     loop σ'
 }
+
 
 meta def main : io unit := do {
    args ← io.cmdline_args,

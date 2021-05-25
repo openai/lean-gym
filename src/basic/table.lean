@@ -1,4 +1,6 @@
-/- Author: E.W.Ayers © 2019 -/
+/- Author: E.W.Ayers © 2019 
+Copied from the lean-tpe projcet: https://github.com/jesse-michael-han/lean-tpe-public
+-/
 import .list
 
 open expr
