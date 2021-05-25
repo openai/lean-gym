@@ -1,6 +1,7 @@
 # lean-gym
 
-This repository lets you interact with Lean through a REPL.
+This repository lets you interact with Lean through a REPL. This repository heavily builds and
+depends on [lean-gptf](https://github.com/jesse-michael-han/lean-gptf).
 
 ## Setup
 
