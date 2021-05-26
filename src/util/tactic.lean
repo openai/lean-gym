@@ -34,20 +34,20 @@ end add_open_namespace
 
 section hashing
 
-meta def tactic_hash : tactic ℕ := do {                                                                 
-  gs ← tactic.get_goals,                                                                                
-  hs ← gs.mmap $ λ g, do {                                                                              
-    tactic.set_goal_to g,                                                                               
-    es ← (::) <$> tactic.target <*> tactic.local_context,                                               
-    pure $ es.foldl (λ acc e, acc + e.hash) 0},                                                         
-  pure $ hs.sum                                                                                         
-}         
+meta def tactic_hash : tactic ℕ := do {
+  gs ← tactic.get_goals,
+  hs ← gs.mmap $ λ g, do {
+    tactic.set_goal_to g,
+    es ← (::) <$> tactic.target <*> tactic.local_context,
+    pure $ es.foldl (λ acc e, acc + e.hash) 0},
+  pure $ hs.sum
+}
 
 end hashing
 
 
 section option
-meta def option.to_tactic {α} (x : option α ) (exception_msg : string := "[option.to_tactic] failed") : tactic α := 
+meta def option.to_tactic {α} (x : option α ) (exception_msg : string := "[option.to_tactic] failed") : tactic α :=
 match x with
 | (some val) := pure val
 | none := tactic.fail exception_msg
@@ -56,3 +56,12 @@ end
 -- run_cmd ((none : option ℕ).to_tactic "FAILURE") -- errors with "FAILURE"
 -- run_cmd ((some 42 : option ℕ).to_tactic >>= tactic.trace) -- 42
 end option
+
+section misc
+
+meta def tactic.is_theorem (nm : name) : tactic bool := do {
+  env ← tactic.get_env,
+  declaration.is_theorem <$> env.get nm
+}
+
+end misc
