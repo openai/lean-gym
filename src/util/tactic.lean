@@ -56,3 +56,12 @@ end
 -- run_cmd ((none : option ℕ).to_tactic "FAILURE") -- errors with "FAILURE"
 -- run_cmd ((some 42 : option ℕ).to_tactic >>= tactic.trace) -- 42
 end option
+
+section misc
+
+meta def tactic.is_theorem (nm : name) : tactic bool := do {
+  env ← tactic.get_env,
+  declaration.is_theorem <$> env.get nm
+}
+
+end misc
