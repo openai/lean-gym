@@ -7,7 +7,7 @@ depends on [lean-gptf](https://github.com/jesse-michael-han/lean-gptf).
 
 ```bash
 # download pre-built binaries and build the project
-leanpkg configure && leanproject get-mathlib-cache && leanpkg build
+bash ./setup.sh
 ```
 
 ## Usage
