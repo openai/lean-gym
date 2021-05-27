@@ -3,7 +3,8 @@ Copyright (c) 2021 OpenAI. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Author(s): Stanislas Polu, Jesse Michael Han
 
-REPL implementation to interact with Lean through stdio at a specific declaration.
+REPL implementation to interact with Lean through stdio at a specific
+declaration.
 -/
 import tactic
 import data.string.basic
@@ -38,7 +39,6 @@ meta structure LeanREPLState : Type :=
 namespace LeanREPLState
 
 meta def insert (σ : LeanREPLState) (k) (v) : LeanREPLState := ⟨dict.insert k v σ.1⟩
-
 
 meta def get (σ : LeanREPLState) (k) : option tactic_state := σ.1.get k
 
