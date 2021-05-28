@@ -114,7 +114,6 @@ meta def handle_run_tac
       tactic.write ts,
       get_tac_and_capture_result req.payload 5000 <|> do {
           let msg : format := format!"parse_itactic failed on `{req.payload}`",
-          tactic.trace msg,
           interaction_monad.mk_exception msg none <$> tactic.read
       }
     },
@@ -184,7 +183,7 @@ meta def main : io unit := do {
    } <|> pure ff,
 
    match is_theorem with
-   | ff := io.fail' format! "[error] not_a_theorem: name={th_name}"
+   | ff := io.fail' format! "[fatal] not_a_theorem: name={th_name}"
    | tt := do {
     ⟨σ₀, res₀⟩ ← init th_name open_ns,
     io.put_str_ln' $ format! "{res₀}",

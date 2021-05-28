@@ -7,7 +7,7 @@ depends on [lean-gptf](https://github.com/jesse-michael-han/lean-gptf).
 
 ```bash
 # download pre-built binaries and build the project
-bash ./setup.sh
+bash ./scripts/setup.sh
 ```
 
 ## Usage
