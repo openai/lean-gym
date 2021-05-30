@@ -37,9 +37,10 @@ section hashing
 meta def tactic_hash : tactic ℕ := do {
   gs ← tactic.get_goals,
   hs ← gs.mmap $ λ g, do {
-    tactic.set_goal_to g,
-    es ← (::) <$> tactic.target <*> tactic.local_context,
-    pure $ es.foldl (λ acc e, acc + e.hash) 0},
+    tactic.set_goals [g],
+    es ← (::) <$> tactic.target <*> (list.map expr.reduce_let <$> tactic.local_context),
+    pure $ es.foldl (λ acc e, acc + e.hash) 0
+  },
   pure $ hs.sum
 }
 
