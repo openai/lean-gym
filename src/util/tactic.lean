@@ -39,7 +39,7 @@ meta def tactic_hash : tactic ℕ := do {
   hs ← gs.mmap $ λ g, do {
     tactic.set_goals [g],
     es ← (::) <$> tactic.target <*> tactic.local_context,
-    pure $ es.foldl (λ acc e, acc + e.reduce_let.hash) 0
+    es.mfoldl (λ acc e, (+) acc <$> expr.hash <$> tactic.head_zeta e) 0
   },
   pure $ hs.sum
 }
