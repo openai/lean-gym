@@ -83,7 +83,7 @@ meta instance : has_from_json LeanREPLRequest := ⟨λ msg, match msg with
 meta def LeanREPL := state_t LeanREPLState io
 
 meta def LeanREPL.forever {α} (x : LeanREPL α) : LeanREPL α :=
-iterate_until x (pure ∘ (λ x, ff)) 1000000 $
+iterate_until x (pure ∘ (λ x, ff)) 9999999 $
   state_t.lift $ io.fail' $ format! "[LeanREPL.forever] fuel exhausted"
 
 meta def record_ts {m} [monad m] (sid: string) (ts : tactic_state) : (state_t LeanREPLState m) string := do {
