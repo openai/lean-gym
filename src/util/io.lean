@@ -42,7 +42,7 @@ meta def list.nth_except {α} : list α → ℕ → string → io α := λ xs po
   end
 
 
-meta def option.to_io {α} (x : option α ) (exception_msg : string := "[option.to_io] failed") : io α := 
+meta def option.to_io {α} (x : option α ) (exception_msg : string := "[option.to_io] failed") : io α :=
 match x with
 | (some val) := pure val
 | none := io.fail exception_msg

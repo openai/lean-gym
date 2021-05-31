@@ -55,6 +55,9 @@ meta instance : has_from_json LeanREPLRequest := ⟨λ msg, match msg with
 @[reducible]
 meta def LeanREPL := state_t LeanREPLState io
 
+meta def LeanREPL.forever {α} (x : LeanREPL α) : LeanREPL α :=
+iterate_until x (pure ∘ (λ x, ff)) 1000000 $
+  state_t.lift $ io.fail' $ format! "[LeanREPL.forever] fuel exhausted"
 
 meta def record_ts {m} [monad m] (ts : tactic_state) (hash : ℕ) : (state_t LeanREPLState m) string := do {
   let id := (format! "{hash}").to_string,
@@ -170,7 +173,6 @@ meta def loop : LeanREPL unit := do {
   loop
 }
 
-
 meta def main : io unit := do {
    args ← io.cmdline_args,
    th_name_str ← args.nth_except 0 "theorem name",
@@ -192,7 +194,7 @@ meta def main : io unit := do {
    | tt := do {
     ⟨σ₀, res₀⟩ ← init th_name open_ns,
     io.put_str_ln' $ format! "{(json.unparse ∘ LeanREPLResponse.to_json) res₀}",
-    state_t.run loop σ₀ $> ()
+    state_t.run loop.forever σ₀ $> ()
    }
    end
 }
