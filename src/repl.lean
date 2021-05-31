@@ -38,23 +38,23 @@ meta structure LeanREPLResponse : Type :=
 
 
 meta structure LeanREPLState : Type :=
-(state: dict string (dict string tactic_state))
+(state : dict string (dict string tactic_state))
+(next_sid : ℕ)
 
 namespace LeanREPLState
 
--- meta def insert (σ : LeanREPLState) (k) (v) : LeanREPLState := ⟨dict.insert k v σ.1⟩
+meta def insert_ts (σ : LeanREPLState) (sid) (tsid) (ts) : LeanREPLState := 
+  ⟨dict.insert sid (dict.insert tsid ts (σ.1.get_default (dict.empty) sid)) σ.1, σ.2⟩ 
 
-meta def insert (σ : LeanREPLState) (sid) (tsid) (ts) : LeanREPLState := 
-  ⟨dict.insert sid (dict.insert tsid ts (σ.1.get_default (dict.empty) sid)) σ.1⟩ 
+meta def get_ts (σ : LeanREPLState) (sid) (tsid) : option tactic_state := (σ.1.get_default (dict.empty) sid).get tsid
 
--- meta def get (σ : LeanREPLState) (k) : option tactic_state := σ.1.get k
-meta def get (σ : LeanREPLState) (sid) (tsid) : option tactic_state := (σ.1.get_default (dict.empty) sid).get tsid
+meta def get_next_tsid (σ : LeanREPLState) (sid) : string := (format! "{(σ.1.get_default (dict.empty) sid).size}").to_string
 
-meta def erase (σ : LeanREPLState) (sid) : LeanREPLState := ⟨σ.1.erase sid⟩
+meta def erase_search (σ : LeanREPLState) (sid) : LeanREPLState := ⟨σ.1.erase sid, σ.2⟩
 
-meta def next_sid (σ : LeanREPLState) : string := (format! "{σ.1.size}").to_string
+meta def get_next_sid (σ : LeanREPLState) : string := (format! "{σ.1.size}").to_string
 
-meta def next_tsid (σ : LeanREPLState) (sid) : string := (format! "{(σ.1.get_default (dict.empty) sid).size}").to_string
+meta def incr_next_sid (σ : LeanREPLState) : LeanREPLState := ⟨σ.1, σ.2+1⟩ 
 
 end LeanREPLState
 
@@ -88,8 +88,8 @@ iterate_until x (pure ∘ (λ x, ff)) 1000000 $
 
 meta def record_ts {m} [monad m] (sid: string) (ts : tactic_state) : (state_t LeanREPLState m) string := do {
   σ ← get,
-  let tsid := σ.next_tsid sid,
-  modify $ λ σ, σ.insert sid tsid ts,
+  let tsid := σ.get_next_tsid sid,
+  modify $ λ σ, σ.insert_ts sid tsid ts,
   pure tsid
 }
 
@@ -156,7 +156,8 @@ meta def handle_init_search
        add_open_namespaces decl_open_ns,
        tactic.read
      },
-     let sid := σ.next_sid,
+     let sid := σ.get_next_sid,
+     modify $ λ σ, σ.incr_next_sid,
      tsid ← record_ts sid ts,
      ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts.fully_qualified >>= postprocess_tactic_state,
      pure $ ⟨sid, tsid, ts_str, none⟩
@@ -168,7 +169,7 @@ meta def handle_init_search
 meta def handle_clear_search
   (req : LeanREPLRequest)
   : LeanREPL LeanREPLResponse := do {
-   modify $ λ σ, σ.erase req.sid,
+   modify $ λ σ, σ.erase_search req.sid,
    pure $ ⟨req.sid, none, none, none⟩ 
 }
 
@@ -177,7 +178,7 @@ meta def handle_run_tac
   (req : LeanREPLRequest)
   : LeanREPL LeanREPLResponse := do {
   σ ← get,
-  match (σ.get req.sid req.tsid) with
+  match (σ.get_ts req.sid req.tsid) with
   | none := do { -- no-op on state
     let err := format! "unknown_id: sid={req.sid} tsid={req.tsid}",
     pure ⟨none, none, none, some err.to_string⟩
@@ -234,7 +235,8 @@ meta def loop : LeanREPL unit := do {
 }
 
 meta def main : io unit := do {
-   state_t.run loop.forever ⟨dict.empty⟩ $> ()
+   io.put_str_ln' $ format! "{(json.unparse ∘ LeanREPLResponse.to_json) ⟨none, none, none, none⟩}",
+   state_t.run loop.forever ⟨dict.empty, 0⟩ $> ()
 }
 
 end main
