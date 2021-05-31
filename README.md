@@ -6,7 +6,7 @@ depends on [lean-gptf](https://github.com/jesse-michael-han/lean-gptf).
 ## Setup
 
 ```bash
-# download pre-built binaries and build the project
+# Download pre-built binaries and build the project (targeting mathlib).
 bash ./scripts/setup.sh
 ```
 
