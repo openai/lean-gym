@@ -28,9 +28,7 @@ state which is returned at initialization:
 
 ```
 $ lean --run src/repl.lean nat.prime_iff_prime_int ""
-[success] 919387232
-⊢ ∀ {p : ℕ}, nat.prime p ↔ prime ↑p
-[end]
+{"error":null,id:"919387232","tactic_state":"⊢ ∀ {p : ℕ}, nat.prime p ↔ prime ↑p"}
 ```
 
 The `run_tac` command applies a tactic string to the tactic state denoted by the
@@ -39,44 +37,19 @@ an error message otherwise.
 
 ```
 $ lean --run src/repl.lean int.prime.dvd_mul ""      
-[success] 1258804314
-⊢ ∀ {m n : ℤ} {p : ℕ}, nat.prime p → ↑p ∣ m * n → p ∣ m.nat_abs ∨ p ∣ n.nat_abs
-[end]
-
-["run_tac", "1258804314", "intros"]
-[success] 4630108822
-m n : ℤ,
-p : ℕ,
-hp : nat.prime p,
-h : ↑p ∣ m * n
-⊢ p ∣ m.nat_abs ∨ p ∣ n.nat_abs
-[end]
-
-["run_tac", "4630108822", "apply (nat.prime.dvd_mul hp).mp"]
-[success] 5032220362
-m n : ℤ,
-p : ℕ,
-hp : nat.prime p,
-h : ↑p ∣ m * n
-⊢ p ∣ m.nat_abs * n.nat_abs
-[end]
-
-["run_tac", "5032220362", "rw ← int.nat_abs_mul"]
-[success] 5026170610
-m n : ℤ,
-p : ℕ,
-hp : nat.prime p,
-h : ↑p ∣ m * n
-⊢ p ∣ (m * n).nat_abs
-[end]
-
-["run_tac", "5026170610", "simp"]
-[error] run_tac_failed: pos=(some ⟨1, 2⟩) msg=simplify tactic failed to simplify
-[end]
-
-["run_tac", "5026170610", "exact int.coe_nat_dvd_left.mp h"]
-[success] 0
-no goals
-[end]
-
+{"error":null,"id":"2137499499","tactic_state":"⊢ ∀ {m n : ℤ} {p : ℕ}, nat.prime p → ↑p ∣ m * n → p ∣ m.nat_abs ∨ p ∣ n.nat_abs"}
+["run_tac", "2137499499", "intros"]
+{"error":null,"id":"6701217918","tactic_state":"m n : ℤ,\tp : ℕ,\thp : nat.prime p,\th : ↑p ∣ m * n\t⊢ p ∣ m.nat_abs ∨ p ∣ n.nat_abs"}
+["run_tac", "6701217918", "apply (nat.prime.dvd_mul hp).mp"]
+{"error":null,"id":"7348884859","tactic_state":"m n : ℤ,\tp : ℕ,\thp : nat.prime p,\th : ↑p ∣ m * n\t⊢ p ∣ m.nat_abs * n.nat_abs"}
+["run_tac", "7348884859", "rw ← int.nat_abs_mul"]
+{"error":null,"id":"8420007981","tactic_state":"m n : ℤ,\tp : ℕ,\thp : nat.prime p,\th : ↑p ∣ m * n\t⊢ p ∣ (m * n).nat_abs"}
+["run_tac", "8420007981", "simp"]
+{"error":"run_tac_failed: pos=(some ⟨1, 2⟩) msg=simplify tactic failed to simplify","id":null,"tactic_state":null}
+["run_tac", "8420007981", "exact int.coe_nat_dvd_left.mp h"]
+{"error":null,"id":"0","tactic_state":"no goals"}
 ```
+
+## Declaration names
+
+Declaration names and open namespaces as recorded by [lean_proof_recording](https://github.com/jasonrute/lean-proof-recording-public) are available in the `data/` directory.

@@ -62,22 +62,25 @@ meta def record_ts {m} [monad m] (ts : tactic_state) (hash : ℕ) : (state_t Lea
   pure id
 }
 
+meta def LeanREPLResponse.to_json: LeanREPLResponse → json
+| ⟨id, ts, err⟩ :=
+    json.object [
+      ⟨"id", match id with
+        | none := json.null
+        | some id := json.of_string id
+        end⟩,
+      ⟨"tactic_state", match ts with
+        | none := json.null
+        | some ts := json.of_string ts
+        end⟩,
+      ⟨"error", match err with
+        | none := json.null
+        | some err := json.of_string err
+        end⟩
+    ]
 
 meta instance : has_to_format LeanREPLResponse :=
-  ⟨λ ⟨id, ts, err⟩, do {
-    match id with
-    | (some id) := match ts with
-      | (some ts) := format!"[success] {id}\n{ts}\n[end]"
-      | (none) := format!"[error] unexpected_undefined_ts\n[end]"
-      end
-    | none := do {
-      match err with
-      | some err := format!"[error] {err}\n[end]"
-      | none := format!"[error] unexpected_undefined_error\n[end]"
-      end
-    }
-    end
-  }⟩
+⟨has_to_format.to_format ∘ LeanREPLResponse.to_json⟩
 
 meta def init
   (th_name : name)
@@ -96,7 +99,8 @@ meta def init
       pure $ prod.mk h ts
   },
   ⟨h_str, σ₀⟩ ← state_t.run (record_ts ts h) ⟨dict.empty⟩,
-  pure $ ⟨σ₀, ⟨h_str, some ts.to_format.to_string, none⟩⟩
+  ts_str ← io.run_tactic'' $ postprocess_tactic_state ts,
+  pure $ ⟨σ₀, ⟨h_str, some ts_str, none⟩⟩
 }
 
 
@@ -121,7 +125,8 @@ meta def handle_run_tac
     | interaction_monad.result.success s ts' := do {
         h ← (state_t.lift ∘ io.run_tactic'') $ tactic.write ts' *> tactic_hash,
         h_str ← record_ts ts' h,
-        pure $ ⟨h_str, ts'.to_format.to_string, none⟩
+        ts_str ← (state_t.lift ∘ io.run_tactic'') $ postprocess_tactic_state ts',
+        pure $ ⟨h_str, ts_str, none⟩
       }
     | interaction_monad.result.exception fn pos old := state_t.lift $ do {
         let msg := (fn.get_or_else (λ _, format.of_string "n/a")) (),
@@ -161,7 +166,7 @@ do lean.parser.run_with_input (many ident) open_ns
 meta def loop : LeanREPL unit := do {
   req ← (state_t.lift $ io.get_line >>= parse_request),
   res ← handle_request req,
-  state_t.lift $ io.put_str_ln' $ format! "{res}",
+  state_t.lift $ io.put_str_ln' $ format! "{(json.unparse ∘ LeanREPLResponse.to_json) res}",
   loop
 }
 
@@ -186,7 +191,7 @@ meta def main : io unit := do {
    | ff := io.fail' format! "[fatal] not_a_theorem: name={th_name}"
    | tt := do {
     ⟨σ₀, res₀⟩ ← init th_name open_ns,
-    io.put_str_ln' $ format! "{res₀}",
+    io.put_str_ln' $ format! "{(json.unparse ∘ LeanREPLResponse.to_json) res₀}",
     state_t.run loop σ₀ $> ()
    }
    end
