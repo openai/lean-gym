@@ -235,7 +235,7 @@ meta def loop : LeanREPL unit := do {
 }
 
 meta def main : io unit := do {
-  state_t.run loop ⟨dict.empty, 0⟩ $> ()
+  state_t.run loop.forever ⟨dict.empty, 0⟩ $> ()
 }
 
 end main
