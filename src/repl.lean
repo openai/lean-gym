@@ -96,11 +96,11 @@ meta def record_ts {m} [monad m] (sid: string) (ts : tactic_state) : (state_t Le
 meta def LeanREPLResponse.to_json: LeanREPLResponse → json
 | ⟨sid, tsid, ts, err⟩ :=
     json.object [
-      ⟨"sid", match sid with
+      ⟨"search_id", match sid with
         | none := json.null
         | some sid := json.of_string sid
         end⟩,
-      ⟨"tsid", match tsid with
+      ⟨"tactic_state_id", match tsid with
         | none := json.null
         | some tsid := json.of_string tsid
         end⟩,
