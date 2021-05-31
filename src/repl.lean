@@ -229,8 +229,7 @@ meta def parse_request (msg : string) : io LeanREPLRequest := do {
 meta def loop : LeanREPL unit := do {
   req ← (state_t.lift $ io.get_line >>= parse_request),
   res ← handle_request req,
-  state_t.lift $ io.put_str_ln' $ format! "{(json.unparse ∘ LeanREPLResponse.to_json) res}",
-  loop
+  state_t.lift $ io.put_str_ln' $ format! "{(json.unparse ∘ LeanREPLResponse.to_json) res}"
 }
 
 meta def main : io unit := do {
