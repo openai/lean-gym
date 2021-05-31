@@ -209,12 +209,11 @@ meta def handle_run_tac
 }
 
 
-meta def handle_request (req : LeanREPLRequest) : LeanREPL LeanREPLResponse := -- spec for req cmds defined here
+meta def handle_request (req : LeanREPLRequest) : LeanREPL LeanREPLResponse :=
 match req.cmd with
 | "run_tac" := handle_run_tac req
 | "init_search" := handle_init_search req
 | "clear_search" := handle_clear_search req
--- | "info" := handle_info req
 | exc := state_t.lift $ io.fail' format! "[fatal] unknown_command: cmd={exc}"
 end
 
