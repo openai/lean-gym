@@ -235,8 +235,7 @@ meta def loop : LeanREPL unit := do {
 }
 
 meta def main : io unit := do {
-   io.put_str_ln' $ format! "{(json.unparse ∘ LeanREPLResponse.to_json) ⟨none, none, none, none⟩}",
-   state_t.run loop.forever ⟨dict.empty, 0⟩ $> ()
+  state_t.run loop ⟨dict.empty, 0⟩ $> ()
 }
 
 end main

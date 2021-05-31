@@ -16,9 +16,8 @@ bash ./scripts/setup.sh
 lean --run src/repl.lean
 ```
 
-Starts a fresh REPL, returning an empty response object once it is ready.
+Starts a fresh REPL. Once started, the REPL accepts the following commands:
 
-Once started, the REPL accepts the following commands:
 - `init_search`: takes a declaration name as well as a list of open namespaces
 to initialize a search at the given declaration, returning the initial tactic
 state (along with a fresh `search_id` and `tactic_state_id`).
@@ -28,7 +27,6 @@ the tactic state denoted by the provided ids.
 
 ```
 $ lean --run src/repl.lean
-{"error":null,"sid":null,"tactic_state":null,"tsid":null}
 ["init_search", ["intermediate_field.adjoin.range_algebra_map_subset", "intermediate_field finite_dimensional polynomial"]]
 {"error":null,"sid":"0","tactic_state":"⊢ ∀ (F : Type u_1) [_inst_1 : field F] {E : Type u_2} [_inst_2 : field E] [_inst_3 : algebra F E] (S : set E),\tset.range ⇑(algebra_map F E) ⊆ ↑(intermediate_field.adjoin F S)","tsid":"0"}
 ["init_search", ["int.prime.dvd_mul", ""]]
