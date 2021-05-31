@@ -99,7 +99,7 @@ meta def init
       pure $ prod.mk h ts
   },
   ⟨h_str, σ₀⟩ ← state_t.run (record_ts ts h) ⟨dict.empty⟩,
-  ts_str ← io.run_tactic'' $ postprocess_tactic_state ts,
+  ts_str ← io.run_tactic'' $ ts.fully_qualified >>= postprocess_tactic_state,
   pure $ ⟨σ₀, ⟨h_str, some ts_str, none⟩⟩
 }
 
@@ -125,7 +125,7 @@ meta def handle_run_tac
     | interaction_monad.result.success s ts' := do {
         h ← (state_t.lift ∘ io.run_tactic'') $ tactic.write ts' *> tactic_hash,
         h_str ← record_ts ts' h,
-        ts_str ← (state_t.lift ∘ io.run_tactic'') $ postprocess_tactic_state ts',
+        ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts'.fully_qualified >>= postprocess_tactic_state,
         pure $ ⟨h_str, ts_str, none⟩
       }
     | interaction_monad.result.exception fn pos old := state_t.lift $ do {
