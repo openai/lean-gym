@@ -133,22 +133,27 @@ do lean.parser.run_with_input (many ident) open_ns
 meta def handle_init_search
   (req : LeanREPLRequest)
   : LeanREPL LeanREPLResponse := do {
-
    σ ← get,
+   -- Parse declaration name.
    decl_name ← state_t.lift $ io.run_tactic'' $ do {
      parse_theorem_name req.name
    },
+   -- Parse open namespaces.
    decl_open_ns ← state_t.lift $ io.run_tactic'' $ do {
      parse_open_namespace req.open_ns
    },
+   -- Check that the declaration is a theorem.
    is_theorem ← state_t.lift $ io.run_tactic'' $ do {
      tactic.is_theorem decl_name
    } <|> pure ff,
    match is_theorem with
+   -- The declaration is not a theorem, return an error.
    | ff := do {
      let err := format! "not_a_theorem: name={req.name} open_ns={req.open_ns}",
      pure ⟨none, none, none, some err.to_string⟩
    }
+   -- The declaration is a theorem, set the env with open namespaces to it and
+   -- generate a new tactic state.
    | tt := do {
      ts ← state_t.lift $ io.run_tactic'' $ do {
        env ← tactic.get_env,
@@ -173,6 +178,7 @@ meta def handle_init_search
 meta def handle_clear_search
   (req : LeanREPLRequest)
   : LeanREPL LeanREPLResponse := do {
+   -- Simply remove the table associated with the provided search id from the state.
    modify $ λ σ, σ.erase_search req.sid,
    pure $ ⟨req.sid, none, none, none⟩ 
 }
@@ -183,11 +189,14 @@ meta def handle_run_tac
   : LeanREPL LeanREPLResponse := do {
   σ ← get,
   match (σ.get_ts req.sid req.tsid) with
-  | none := do { -- no-op on state
+  -- Received an unknown search id, return an error.
+  | none := do {
     let err := format! "unknown_id: sid={req.sid} tsid={req.tsid}",
     pure ⟨none, none, none, some err.to_string⟩
   }
+  -- The tactic state was retrieved from the state.
   | (some ts) := do {
+    -- Set the tactic state and try to apply the tactic.
     result_with_string ← state_t.lift $ io.run_tactic'' $ do {
       tactic.write ts,
       get_tac_and_capture_result req.tac 5000 <|> do {
@@ -196,15 +205,17 @@ meta def handle_run_tac
       }
     },
     match result_with_string with
+    -- The tactic application was successful.
     | interaction_monad.result.success s ts' := do {
-        h ← (state_t.lift ∘ io.run_tactic'') $ tactic.write ts' *> tactic_hash,
+        -- h ← (state_t.lift ∘ io.run_tactic'') $ tactic.write ts' *> tactic_hash,
         tsid ← record_ts req.sid ts',
         ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts'.fully_qualified >>= postprocess_tactic_state,
         pure $ ⟨req.sid, tsid, ts_str, none⟩
       }
+    -- The tactic application failed, return an error with the failure message.
     | interaction_monad.result.exception fn pos old := state_t.lift $ do {
         let msg := (fn.get_or_else (λ _, format.of_string "n/a")) (),
-        let err := format! "run_tac_failed: pos={pos} msg={msg}",
+        let err := format! "gen_tac_and_capture_res_failed: pos={pos} msg={msg}",
         pure ⟨none, none, none, some err.to_string ⟩
       }
     end
