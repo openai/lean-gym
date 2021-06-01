@@ -20,9 +20,9 @@ meta def run_tactic'' {α} (tac :tactic α) : io α := do {
     match result with
     | (success val _) := pure val
     | (exception m_fmt pos _) := do {
-      let fmt_msg := (m_fmt.get_or_else (λ _, format!"none")) (),
-      let msg := format!"{fmt_msg}",
-      tactic.trace msg,
+      let fmt_msg := (m_fmt.get_or_else (λ _, format!"n/a")) (),
+      let msg := format!"run_tactic_failed: failed: pos={pos} msg={fmt_msg}",
+      tactic.trace format!"TRACE RUN_TACTIC FAILURE: {msg}",
       tactic.fail msg
     }
     end
@@ -31,19 +31,3 @@ meta def run_tactic'' {α} (tac :tactic α) : io α := do {
 
 end io
 end io
-
-
--- convenience function for command-line argument parsing
-meta def list.nth_except {α} : list α → ℕ → string → io α := λ xs pos msg,
-  match (xs.nth pos) with
-  | (some result) := pure result
-  | none := do
-    io.fail' format!"must supply {msg} as argument {pos}"
-  end
-
-
-meta def option.to_io {α} (x : option α ) (exception_msg : string := "[option.to_io] failed") : io α :=
-match x with
-| (some val) := pure val
-| none := io.fail exception_msg
-end
