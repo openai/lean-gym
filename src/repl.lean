@@ -191,7 +191,7 @@ meta def handle_run_tac
   match (σ.get_ts req.sid req.tsid) with
   -- Received an unknown search id, return an error.
   | none := do {
-    let err := format! "unknown_id: sid={req.sid} tsid={req.tsid}",
+    let err := format! "unknown_id: search_id={req.sid} tactic_state_id={req.tsid}",
     pure ⟨none, none, none, some err.to_string⟩
   }
   -- The tactic state was retrieved from the state.

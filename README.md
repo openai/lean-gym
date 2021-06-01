@@ -1,6 +1,6 @@
 # lean-gym
 
-This repository lets you interact with Lean through a REPL. This repository heavily builds and
+This repository lets you interact with Lean through a REPL. It builds and
 depends on [lean-gptf](https://github.com/jesse-michael-han/lean-gptf).
 
 ## Setup
@@ -19,11 +19,15 @@ lean --run src/repl.lean
 Starts a fresh REPL. Once started, the REPL accepts the following commands:
 
 - `init_search`: takes a declaration name as well as a list of open namespaces
-to initialize a search at the given declaration, returning the initial tactic
-state (along with a fresh `search_id` and `tactic_state_id`).
+to initialize a search at the given declaration opening the provided namespaces,
+and returning the initial tactic state (along with a fresh `search_id` and
+`tactic_state_id`).
 - `run_tac`: takes a `search_id`, a `tactic_state_id` and a tactic to apply at
 the tactic state denoted by the provided ids.
 - `clear_search`: takes a `search_id` to clear all state related to a search.
+
+The commands can be interleaved freely enabling the parallelization of multiple
+proof searches against the same REPL.
 
 ```
 $ lean --run src/repl.lean
@@ -50,7 +54,7 @@ $ lean --run src/repl.lean
 {"error":"run_tac_failed: pos=(some ⟨1, 2⟩) msg=simplify tactic failed to simplify","search_id":null,"tactic_state":null,"tactic_state_id":null}
 
 ["run_tac",["1","5","exact int.coe_nat_dvd_left.mp h"]]
-{"error":"unknown_id: sid=1 tsid=5","search_id":null,"tactic_state":null,"tactic_state_id":null}
+{"error":"unknown_id: search_id=1 tactic_state_id=5","search_id":null,"tactic_state":null,"tactic_state_id":null}
 
 ["run_tac",["1","3","exact int.coe_nat_dvd_left.mp h"]]
 {"error":null,"search_id":"1","tactic_state":"no goals","tactic_state_id":"4"}
@@ -80,3 +84,8 @@ Declaration names and open namespaces as recorded by
 [lean_proof_recording](https://github.com/jasonrute/lean-proof-recording-public)
 are available in the `data/` directory to be used with the `init_search`
 command.
+
+## Notes
+
+The REPL is subject to crashes in rare cases. Empirically such crash happens no
+more than ~0.01% of the time.
