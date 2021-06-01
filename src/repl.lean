@@ -52,7 +52,7 @@ meta def get_next_tsid (σ : LeanREPLState) (sid) : string := (format! "{(σ.1.g
 
 meta def erase_search (σ : LeanREPLState) (sid) : LeanREPLState := ⟨σ.1.erase sid, σ.2⟩
 
-meta def get_next_sid (σ : LeanREPLState) : string := (format! "{σ.1.size}").to_string
+meta def get_next_sid (σ : LeanREPLState) : string := (format! "{σ.2}").to_string
 
 meta def incr_next_sid (σ : LeanREPLState) : LeanREPLState := ⟨σ.1, σ.2+1⟩ 
 
@@ -82,9 +82,13 @@ meta instance : has_from_json LeanREPLRequest := ⟨λ msg, match msg with
 @[reducible]
 meta def LeanREPL := state_t LeanREPLState io
 
-meta def LeanREPL.forever {α} (x : LeanREPL α) : LeanREPL α :=
-iterate_until x (pure ∘ (λ x, ff)) 9999999 $
-  state_t.lift $ io.fail' $ format! "[LeanREPL.forever] fuel exhausted"
+meta def LeanREPL.forever (x : LeanREPL unit) : LeanREPL unit := do
+  σ₀ ← get,
+  state_t.lift $ io.iterate σ₀ $ λ σ, do {
+    (_, σ') ← x.run σ,
+    return (some σ')
+  },
+  state_t.lift $ io.fail' $ format! "[LeanREPL.forever] unreachable code"
 
 meta def record_ts {m} [monad m] (sid: string) (ts : tactic_state) : (state_t LeanREPLState m) string := do {
   σ ← get,
