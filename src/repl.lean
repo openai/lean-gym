@@ -213,26 +213,38 @@ meta def handle_run_tac
           tactic.num_goals
         },
         match n with
-        -- There is no more subgoals.
+        -- There is no more subgoals, check that the produce proof is valid.
         | 0 := do {
-          result ← (state_t.lift ∘ io.run_tactic'') $ do {
-            -- ts' was already set above to compute remaining goals.
-            pf ← tactic.result,
-            tactic.capture' (validate_proof pf)
-          },
-          match result with
-          | (interaction_monad.result.success r s') := do {
-            tsid ← record_ts req.sid ts',
-            ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts'.fully_qualified >>= postprocess_tactic_state,
-            pure $ ⟨req.sid, tsid, ts_str, none⟩
-          }
-          | (interaction_monad.result.exception f p s') := do {
-            let err := format! "proof_validation_failed: proof is invalid or uses sorry",
+          -- Retrieve the tactic state at index 0 to extract the top-level goal metavariable.
+          match σ.get_ts req.sid "0" with
+          | none := do {
+            let err := format! "unexpected_unknown_tsid: search_id={req.sid} tactic_state_id=0",
             pure ⟨none, none, none, some err.to_string⟩
+          }
+          | (some ts₀) := do {
+            result ← (state_t.lift ∘ io.run_tactic'') $ do {
+              -- Set to tactic state index 0 to retrieve the meta-variable for the top goal.
+              tactic.write ts₀,
+              [g] ← tactic.get_goals,
+              tactic.write ts',
+              pf ← tactic.get_assignment g >>= tactic.instantiate_mvars,
+              tactic.capture' (validate_proof g pf)
+            },
+            match result with
+            | (interaction_monad.result.success r s') := do {
+              tsid ← record_ts req.sid ts',
+              ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts'.fully_qualified >>= postprocess_tactic_state,
+              pure $ ⟨req.sid, tsid, ts_str, none⟩
+            }
+            | (interaction_monad.result.exception f p s') := do {
+              let err := format! "proof_validation_failed: proof is invalid or uses sorry",
+              pure ⟨none, none, none, some err.to_string⟩
+            }
+            end
           }
           end
         }
-        -- There are remaining subgoals.
+        -- There are remaining subgoals, return the updated tactic state.
         | n := do {
           tsid ← record_ts req.sid ts',
           ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts'.fully_qualified >>= postprocess_tactic_state,
