@@ -12,4 +12,4 @@ cp ./_target/deps/mathlib/scripts/mk_all.sh ./_target/deps/minif2f/lean/scripts/
 bash ./_target/deps/minif2f/lean/scripts/mk_all.sh
 leanproject get-mathlib-cache
 cd _target/deps/minif2f && leanproject get-mathlib-cache && cd ../../../
-# leanpkg build
+leanpkg build
