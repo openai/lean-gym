@@ -226,9 +226,10 @@ meta def handle_run_tac
               -- Set to tactic state index 0 to retrieve the meta-variable for the top goal.
               tactic.write ts₀,
               [g] ← tactic.get_goals,
+              tgt ← tactic.infer_type g,
               tactic.write ts',
               pf ← tactic.get_assignment g >>= tactic.instantiate_mvars,
-              tactic.capture' (validate_proof g pf)
+              tactic.capture' (validate_proof tgt pf)
             },
             match result with
             | (interaction_monad.result.success r s') := do {
