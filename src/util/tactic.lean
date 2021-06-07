@@ -27,9 +27,6 @@ end tactic
 
 
 section validate
-/-- Creates an empty tactic state. -/
-meta def mk_tactic_state : tactic tactic_state :=
-tactic.unsafe_run_io $ io.run_tactic' $ tactic.exact `(trivial) *> tactic.read
 
 meta def validate_proof (pf: expr) : tactic unit := do {
     guard (bnot pf.has_meta_var),
