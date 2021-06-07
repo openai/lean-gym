@@ -18,8 +18,29 @@ namespace tactic
 meta def set_goal_to (goal : expr) : tactic unit :=
 mk_meta_var goal >>= set_goals ∘ pure
 
+meta def guard_sorry : expr → tactic unit := λ e, do {
+  contains_sorry_flag ← e.mfold ff (λ e' _ acc, if acc then pure acc else pure $ bor acc $ e'.is_sorry.is_some),
+  guard $ bnot contains_sorry_flag
+}
+
 end tactic
 
+
+section validate
+/-- Creates an empty tactic state. -/
+meta def mk_tactic_state : tactic tactic_state :=
+tactic.unsafe_run_io $ io.run_tactic' $ tactic.exact `(trivial) *> tactic.read
+
+meta def validate_proof (pf: expr) : tactic unit := do {
+    guard (bnot pf.has_meta_var),
+    tactic.guard_sorry pf,
+    tactic.type_check pf,
+    src ← tactic.infer_type pf,
+    tgt ← tactic.result,
+    tactic.is_def_eq tgt src
+}
+
+end validate
 
 section add_open_namespace
 

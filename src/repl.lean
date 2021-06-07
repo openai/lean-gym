@@ -208,9 +208,32 @@ meta def handle_run_tac
     -- The tactic application was successful.
     | interaction_monad.result.success s ts' := do {
         -- h ← (state_t.lift ∘ io.run_tactic'') $ tactic.write ts' *> tactic_hash,
-        tsid ← record_ts req.sid ts',
-        ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts'.fully_qualified >>= postprocess_tactic_state,
-        pure $ ⟨req.sid, tsid, ts_str, none⟩
+        n ← (state_t.lift ∘ io.run_tactic'') $ tactic.num_goals,
+        match n with
+        -- There is no more subgoals.
+        | 0 := do {
+          [g] ← (state_t.lift ∘ io.run_tactic'')  $ tactic.get_goals,
+          pf ← (state_t.lift ∘ io.run_tactic'') $ tactic.get_assignment g >>= tactic.instantiate_mvars,
+          result ← (state_t.lift ∘ io.run_tactic'') $ tactic.capture' (validate_proof pf),
+          match result with
+          | (interaction_monad.result.success r s') := do {
+            tsid ← record_ts req.sid ts',
+            ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts'.fully_qualified >>= postprocess_tactic_state,
+            pure $ ⟨req.sid, tsid, ts_str, none⟩
+          }
+          | (interaction_monad.result.exception f p s') := do {
+            let err := format! "proof_validation_failed: proof is invalid or uses sorry",
+            pure ⟨none, none, none, some err.to_string ⟩
+          }
+          end
+        }
+        -- There are remaining subgoals.
+        | _ := do {
+          tsid ← record_ts req.sid ts',
+          ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts'.fully_qualified >>= postprocess_tactic_state,
+          pure $ ⟨req.sid, tsid, ts_str, none⟩
+        }
+        end
       }
     -- The tactic application failed, return an error with the failure message.
     | interaction_monad.result.exception fn pos old := state_t.lift $ do {
