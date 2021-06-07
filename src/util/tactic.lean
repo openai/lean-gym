@@ -29,12 +29,12 @@ end tactic
 section validate
 
 meta def validate_proof (pf: expr) : tactic unit := do {
-    guard (bnot pf.has_meta_var),
+    -- guard (bnot pf.has_meta_var),
     tactic.guard_sorry pf,
     tactic.type_check pf,
-    src ← tactic.infer_type pf,
-    tgt ← tactic.result,
-    tactic.is_def_eq tgt src
+    pft ← tactic.infer_type pf,
+    tgt ← tactic.target,
+    tactic.is_def_eq tgt pft
 }
 
 end validate

@@ -212,21 +212,14 @@ meta def handle_run_tac
           tactic.write ts',
           tactic.num_goals
         },
-        -- (state_t.lift ∘ io.run_tactic'') $ tactic.trace format!"GOALS {n}",
         match n with
         -- There is no more subgoals.
         | 0 := do {
           result ← (state_t.lift ∘ io.run_tactic'') $ do {
-            -- tactic.trace format!"CHECKING",
-            tactic.write ts',
-            -- tactic.trace format!"TACTIC SET",
-            -- [g] ← tactic.get_goals,
-            -- tactic.trace format!"GOT GOALS {g}",
+            -- ts' was already set above to compute remaining goals.
             pf ← tactic.result,
-            -- tactic.trace format!"GOT PROOF {pf}",
             tactic.capture' (validate_proof pf)
           },
-          -- (state_t.lift ∘ io.run_tactic'') $ tactic.trace format!"GOT RESULT {result}",
           match result with
           | (interaction_monad.result.success r s') := do {
             tsid ← record_ts req.sid ts',
