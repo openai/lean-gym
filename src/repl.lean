@@ -208,13 +208,25 @@ meta def handle_run_tac
     -- The tactic application was successful.
     | interaction_monad.result.success s ts' := do {
         -- h ← (state_t.lift ∘ io.run_tactic'') $ tactic.write ts' *> tactic_hash,
-        n ← (state_t.lift ∘ io.run_tactic'') $ tactic.num_goals,
+        n ← (state_t.lift ∘ io.run_tactic'') $ do {
+          tactic.write ts',
+          tactic.num_goals
+        },
+        -- (state_t.lift ∘ io.run_tactic'') $ tactic.trace format!"GOALS {n}",
         match n with
         -- There is no more subgoals.
         | 0 := do {
-          [g] ← (state_t.lift ∘ io.run_tactic'')  $ tactic.get_goals,
-          pf ← (state_t.lift ∘ io.run_tactic'') $ tactic.get_assignment g >>= tactic.instantiate_mvars,
-          result ← (state_t.lift ∘ io.run_tactic'') $ tactic.capture' (validate_proof pf),
+          result ← (state_t.lift ∘ io.run_tactic'') $ do {
+            -- tactic.trace format!"CHECKING",
+            tactic.write ts',
+            -- tactic.trace format!"TACTIC SET",
+            -- [g] ← tactic.get_goals,
+            -- tactic.trace format!"GOT GOALS {g}",
+            pf ← tactic.result,
+            -- tactic.trace format!"GOT PROOF {pf}",
+            tactic.capture' (validate_proof pf)
+          },
+          -- (state_t.lift ∘ io.run_tactic'') $ tactic.trace format!"GOT RESULT {result}",
           match result with
           | (interaction_monad.result.success r s') := do {
             tsid ← record_ts req.sid ts',
@@ -223,12 +235,12 @@ meta def handle_run_tac
           }
           | (interaction_monad.result.exception f p s') := do {
             let err := format! "proof_validation_failed: proof is invalid or uses sorry",
-            pure ⟨none, none, none, some err.to_string ⟩
+            pure ⟨none, none, none, some err.to_string⟩
           }
           end
         }
         -- There are remaining subgoals.
-        | _ := do {
+        | n := do {
           tsid ← record_ts req.sid ts',
           ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts'.fully_qualified >>= postprocess_tactic_state,
           pure $ ⟨req.sid, tsid, ts_str, none⟩
@@ -239,7 +251,7 @@ meta def handle_run_tac
     | interaction_monad.result.exception fn pos old := state_t.lift $ do {
         let msg := (fn.get_or_else (λ _, format.of_string "n/a")) (),
         let err := format! "gen_tac_and_capture_res_failed: pos={pos} msg={msg}",
-        pure ⟨none, none, none, some err.to_string ⟩
+        pure ⟨none, none, none, some err.to_string⟩
       }
     end
   }
