@@ -218,7 +218,7 @@ meta def handle_run_tac
           -- Retrieve the tactic state at index 0 to extract the top-level goal metavariable.
           match σ.get_ts req.sid "0" with
           | none := do {
-            let err := format! "unexpected_unknown_tsid: search_id={req.sid} tactic_state_id=0",
+            let err := format! "unexpected_unknown_tsid_0: search_id={req.sid}",
             pure ⟨none, none, none, some err.to_string⟩
           }
           | (some ts₀) := do {
