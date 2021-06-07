@@ -89,3 +89,24 @@ command.
 
 The REPL is subject to crashes in rare cases. Empirically such crash happens no
 more than ~0.01% of the time.
+
+When a tactic state is reached with no left goals, some custom logic is run to check that the
+resulting proof's type matches the top level goal type and does not rely on `sorry`. As an example,
+the following two MiniF2F proofs will safely fail with error `proof_validation_failed`.
+
+```
+["init_search", ["mathd_algebra_35", ""]]
+["run_tac", ["0", "0", "intros"]]
+["run_tac", ["0", "1", "sorry"]]
+```
+
+```
+["init_search", ["induction_divisibility_3divnto3m2n", ""]]
+["run_tac", ["0", "0", "intros"]]
+["run_tac", ["0", "1", "rw [add_comm]"]]
+["run_tac", ["0", "2", "have h3 : 1 * (n + 1) ≤ (n + 1)"]]
+["run_tac", ["0", "3", "rw one_mul"]]
+["run_tac", ["0", "4", "apply dvd_trans"]]
+["run_tac", ["0", "5", "swap"]]
+["run_tac", ["0", "6", "simp []"]]
+```
