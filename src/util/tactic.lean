@@ -19,8 +19,9 @@ match e.get_app_fn with
 | _ := ff
 end
 
+
 meta def contains_undefined (e : expr) : bool :=
-e.fold ff $ λ e' _ b, if e.app_symbol_is `undefined then tt else b
+e.fold ff $ λ e' _ b, if e'.app_symbol_is `undefined then tt else b
 
 end expr
 
@@ -30,12 +31,11 @@ namespace tactic
 meta def set_goal_to (goal : expr) : tactic unit :=
 mk_meta_var goal >>= set_goals ∘ pure
 
-meta def guard_sorry (e : expr) : tactic unit := guard e.contains_sorry
+meta def guard_sorry (e : expr) : tactic unit := guard $ bnot e.contains_sorry
 
-meta def guard_undefined (e : expr) : tactic unit := guard e.contains_undefined
+meta def guard_undefined (e : expr) : tactic unit := guard $ bnot e.contains_undefined
 
 end tactic
-
 
 section validate
 
@@ -49,6 +49,12 @@ meta def validate_proof (tgt: expr) (pf: expr) : tactic unit := do {
     -- tactic.trace format!"PFT: {pft}",
     -- tactic.trace format!"TGT: {tgt}",
     tactic.is_def_eq tgt pft
+}
+
+meta def validate_decl (nm : name) : tactic unit := do {
+  env ← tactic.get_env,
+  d ← env.get nm,
+  validate_proof d.type d.value
 }
 
 end validate
