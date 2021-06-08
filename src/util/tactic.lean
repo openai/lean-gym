@@ -23,6 +23,11 @@ meta def guard_sorry : expr → tactic unit := λ e, do {
   guard $ bnot contains_sorry_flag
 }
 
+meta def guard_undefined : expr → tactic unit := λ e, do {
+  contains_undefined ← e.mfold ff (λ e' _ acc, if acc then pure acc else pure $ bor acc $ e'.app_symbol_in [`undefined]),
+  guard $ bnot contains_undefined
+}
+
 end tactic
 
 
@@ -31,8 +36,10 @@ section validate
 meta def validate_proof (tgt: expr) (pf: expr) : tactic unit := do {
     guard (bnot pf.has_meta_var),
     tactic.guard_sorry pf,
+    tactic.guard_undefined pf,
     tactic.type_check pf,
     pft ← tactic.infer_type pf,
+    -- tactic.trace format!"PF: {pf}",
     -- tactic.trace format!"PFT: {pft}",
     -- tactic.trace format!"TGT: {tgt}",
     tactic.is_def_eq tgt pft
