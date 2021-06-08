@@ -1,7 +1,7 @@
 /-
 Copyright (c) 2021 OpenAI. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
-Author(s): Stanislas Polu
+Author(s): Stanislas Polu, Jesse Michael Han
 
 Helper functions to work with the tactic monad.
 -/
@@ -11,22 +11,28 @@ import util.io
 import system.io
 import basic.control
 
-open tactic
+namespace expr
+
+meta def app_symbol_is (e : expr) (nm : name) : bool :=
+match e.get_app_fn with
+| (expr.const n _) := n = nm
+| _ := ff
+end
+
+meta def contains_undefined (e : expr) : bool :=
+e.fold ff $ λ e' _ b, if e.app_symbol_is `undefined then tt else b
+
+end expr
+
 
 namespace tactic
 
 meta def set_goal_to (goal : expr) : tactic unit :=
 mk_meta_var goal >>= set_goals ∘ pure
 
-meta def guard_sorry : expr → tactic unit := λ e, do {
-  contains_sorry_flag ← e.mfold ff (λ e' _ acc, if acc then pure acc else pure $ bor acc $ e'.is_sorry.is_some),
-  guard $ bnot contains_sorry_flag
-}
+meta def guard_sorry (e : expr) : tactic unit := guard e.contains_sorry
 
-meta def guard_undefined : expr → tactic unit := λ e, do {
-  contains_undefined ← e.mfold ff (λ e' _ acc, if acc then pure acc else pure $ bor acc $ e'.app_symbol_in [`undefined]),
-  guard $ bnot contains_undefined
-}
+meta def guard_undefined (e : expr) : tactic unit := guard e.contains_undefined
 
 end tactic
 
