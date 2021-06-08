@@ -1,7 +1,7 @@
 /-
 Copyright (c) 2021 OpenAI. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
-Author(s): Stanislas Polu
+Author(s): Stanislas Polu, Jesse Michael Han
 
 Helper functions to work with the tactic monad.
 -/
@@ -11,31 +11,50 @@ import util.io
 import system.io
 import basic.control
 
-open tactic
+namespace expr
+
+meta def app_symbol_is (e : expr) (nm : name) : bool :=
+match e.get_app_fn with
+| (expr.const n _) := n = nm
+| _ := ff
+end
+
+
+meta def contains_undefined (e : expr) : bool :=
+e.fold ff $ λ e' _ b, if e'.app_symbol_is `undefined then tt else b
+
+end expr
+
 
 namespace tactic
 
 meta def set_goal_to (goal : expr) : tactic unit :=
 mk_meta_var goal >>= set_goals ∘ pure
 
-meta def guard_sorry : expr → tactic unit := λ e, do {
-  contains_sorry_flag ← e.mfold ff (λ e' _ acc, if acc then pure acc else pure $ bor acc $ e'.is_sorry.is_some),
-  guard $ bnot contains_sorry_flag
-}
+meta def guard_sorry (e : expr) : tactic unit := guard $ bnot e.contains_sorry
+
+meta def guard_undefined (e : expr) : tactic unit := guard $ bnot e.contains_undefined
 
 end tactic
-
 
 section validate
 
 meta def validate_proof (tgt: expr) (pf: expr) : tactic unit := do {
     guard (bnot pf.has_meta_var),
     tactic.guard_sorry pf,
+    tactic.guard_undefined pf,
     tactic.type_check pf,
     pft ← tactic.infer_type pf,
+    -- tactic.trace format!"PF: {pf}",
     -- tactic.trace format!"PFT: {pft}",
     -- tactic.trace format!"TGT: {tgt}",
     tactic.is_def_eq tgt pft
+}
+
+meta def validate_decl (nm : name) : tactic unit := do {
+  env ← tactic.get_env,
+  d ← env.get nm,
+  validate_proof d.type d.value
 }
 
 end validate

@@ -91,8 +91,9 @@ The REPL is subject to crashes in rare cases. Empirically such crash happens no
 more than ~0.01% of the time.
 
 When a tactic state is reached with no left goals, some custom logic is run to check that the
-resulting proof's type matches the top level goal type and does not rely on `sorry`. As an example,
-the following two MiniF2F proofs will safely fail with error `proof_validation_failed`.
+resulting proof's type matches the top level goal type and does not rely on `sorry`. We also check
+for the presence of `undefined` in the proof term. As an example, the following MiniF2F proofs will
+safely fail with error `proof_validation_failed`.
 
 ```
 ["init_search", ["mathd_algebra_35", ""]]
@@ -109,4 +110,13 @@ the following two MiniF2F proofs will safely fail with error `proof_validation_f
 ["run_tac", ["0", "4", "apply dvd_trans"]]
 ["run_tac", ["0", "5", "swap"]]
 ["run_tac", ["0", "6", "simp []"]]
+```
+
+```
+["init_search", ["mathd_numbertheory_13", ""]]
+["run_tac", ["0", "0", "intros u v hu hv hsum"]]
+["run_tac", ["0", "1", "intro h"]]
+["run_tac", ["0", "2", "contrapose h"]]
+["run_tac", ["0", "3", "intro hn"]]
+["run_tac", ["0", "4", "exact not_lt_of_lt hn undefined"]]
 ```
