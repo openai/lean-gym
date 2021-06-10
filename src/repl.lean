@@ -183,6 +183,41 @@ meta def handle_clear_search
    pure $ ⟨req.sid, none, none, none⟩ 
 }
 
+meta def finalize_proof
+  (req : LeanREPLRequest)
+  (ts': tactic_state) : LeanREPL LeanREPLResponse := do {
+  σ ← get,
+  -- Retrieve the tactic state at index 0 to extract the top-level goal metavariable.
+  match σ.get_ts req.sid "0" with
+  | none := do {
+    let err := format! "unexpected_unknown_tsid_0: search_id={req.sid}",
+    pure ⟨none, none, none, some err.to_string⟩
+  }
+  | (some ts₀) := do {
+    result ← (state_t.lift ∘ io.run_tactic'') $ do {
+      -- Set to tactic state index 0 to retrieve the meta-variable for the top goal.
+      tactic.write ts₀,
+      [g] ← tactic.get_goals,
+      tgt ← tactic.infer_type g,
+      tactic.write ts',
+      pf ← tactic.get_assignment g >>= tactic.instantiate_mvars,
+      tactic.capture' (validate_proof tgt pf)
+    },
+    match result with
+    | (interaction_monad.result.success r s') := do {
+      tsid ← record_ts req.sid ts',
+      ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts'.fully_qualified >>= postprocess_tactic_state,
+      pure $ ⟨req.sid, tsid, ts_str, none⟩
+    }
+    | (interaction_monad.result.exception f p s') := do {
+      let err := format! "proof_validation_failed: proof is invalid or uses sorry",
+      pure ⟨none, none, none, some err.to_string⟩
+    }
+    end
+  }
+  end
+}
+
 
 meta def handle_run_tac
   (req : LeanREPLRequest)
@@ -206,8 +241,7 @@ meta def handle_run_tac
     },
     match result_with_string with
     -- The tactic application was successful.
-    | interaction_monad.result.success s ts' := do {
-        -- h ← (state_t.lift ∘ io.run_tactic'') $ tactic.write ts' *> tactic_hash,
+    | interaction_monad.result.success _ ts' := do {
         n ← (state_t.lift ∘ io.run_tactic'') $ do {
           tactic.write ts',
           tactic.num_goals
@@ -215,35 +249,7 @@ meta def handle_run_tac
         match n with
         -- There is no more subgoals, check that the produce proof is valid.
         | 0 := do {
-          -- Retrieve the tactic state at index 0 to extract the top-level goal metavariable.
-          match σ.get_ts req.sid "0" with
-          | none := do {
-            let err := format! "unexpected_unknown_tsid_0: search_id={req.sid}",
-            pure ⟨none, none, none, some err.to_string⟩
-          }
-          | (some ts₀) := do {
-            result ← (state_t.lift ∘ io.run_tactic'') $ do {
-              -- Set to tactic state index 0 to retrieve the meta-variable for the top goal.
-              tactic.write ts₀,
-              [g] ← tactic.get_goals,
-              tgt ← tactic.infer_type g,
-              tactic.write ts',
-              pf ← tactic.get_assignment g >>= tactic.instantiate_mvars,
-              tactic.capture' (validate_proof tgt pf)
-            },
-            match result with
-            | (interaction_monad.result.success r s') := do {
-              tsid ← record_ts req.sid ts',
-              ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts'.fully_qualified >>= postprocess_tactic_state,
-              pure $ ⟨req.sid, tsid, ts_str, none⟩
-            }
-            | (interaction_monad.result.exception f p s') := do {
-              let err := format! "proof_validation_failed: proof is invalid or uses sorry",
-              pure ⟨none, none, none, some err.to_string⟩
-            }
-            end
-          }
-          end
+          finalize_proof req ts'
         }
         -- There are remaining subgoals, return the updated tactic state.
         | n := do {
@@ -253,11 +259,28 @@ meta def handle_run_tac
         }
         end
       }
-    -- The tactic application failed, return an error with the failure message.
-    | interaction_monad.result.exception fn pos old := state_t.lift $ do {
-        let msg := (fn.get_or_else (λ _, format.of_string "n/a")) (),
-        let err := format! "gen_tac_and_capture_res_failed: pos={pos} msg={msg}",
-        pure ⟨none, none, none, some err.to_string⟩
+    -- The tactic application failed, potentially return an error with the failure message.
+    | interaction_monad.result.exception fn pos ts' := do {
+        -- Some tactics such as linarith fail but result in a tactic state with no goals. Check if
+        -- that's the case and finalize the proof, otherwise error.
+        n ← (state_t.lift ∘ io.run_tactic'') $ do {
+          tactic.write ts',
+          tactic.num_goals
+        },
+        match n with
+        -- There is no more subgoals, check that the produce proof is valid.
+        | 0 := do {
+          finalize_proof req ts'
+        }
+        -- There are remaining subgoals, return the error.
+        | n := do {
+          state_t.lift $ do {
+            let msg := (fn.get_or_else (λ _, format.of_string "n/a")) (),
+            let err := format! "gen_tac_and_capture_res_failed: pos={pos} msg={msg}",
+            pure ⟨none, none, none, some err.to_string⟩
+          }
+        }
+        end
       }
     end
   }
