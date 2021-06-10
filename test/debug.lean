@@ -6,9 +6,6 @@ import .debug_base
 meta instance : has_to_format LeanREPLRequest :=
 ⟨λ req, format! "LeanREPLRequest ⟨{req.cmd}, {req.sid}, {req.tsid}, {req.tac}, {req.name}, {req.open_ns}⟩"⟩
 
--- meta instance : has_to_format LeanREPLResponse :=
--- ⟨λ req, format! "LeanREPLResponse ⟨{req.sid}, {req.tsid}, {req.tactic_state}, {req.error}⟩"⟩
-
 meta def replay_proof (nm : name) : io unit := do {
   init_search_req : LeanREPLRequest ← io.run_tactic'' $ do{
     msg ← json.parse "[\"init_search\", [\"mathd_numbertheory_136\", \"\"]]",

@@ -211,7 +211,8 @@ meta def finalize_proof
       pure $ ⟨req.sid, tsid, ts_str, none⟩
     }
     | (interaction_monad.result.exception f p s') := do {
-      let err := format! "proof_validation_failed: proof is invalid or uses sorry",
+      let thunk := f.get_or_else (λ _, format! ""),
+      let err := format! "proof_validation_failed: proof is invalid or uses sorry\n{thunk()}",
       pure ⟨none, none, none, some err.to_string⟩
     }
     end
@@ -245,15 +246,18 @@ meta def handle_run_tac
     | interaction_monad.result.success _ ts' := do {
         n ← (state_t.lift ∘ io.run_tactic'') $ do {
           tactic.write ts',
+          tactic.interactive.recover,
           tactic.num_goals
         },
         match n with
         -- There is no more subgoals, check that the produce proof is valid.
         | 0 := do {
           finalize_proof req ts'
+          -- monad_lift $ io.run_tactic'' $ tactic.fail "UNREACHABLE"
         }
         -- There are remaining subgoals, return the updated tactic state.
         | n := do {
+          monad_lift $ io.run_tactic'' $ tactic.trace format! "REMAINING SUBGOALS: {n}",
           tsid ← record_ts req.sid ts',
           ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts'.fully_qualified >>= postprocess_tactic_state,
           pure $ ⟨req.sid, tsid, ts_str, none⟩
@@ -268,13 +272,26 @@ meta def handle_run_tac
           tactic.write ts',
           tactic.num_goals
         },
-        match n with
+        n' ← (state_t.lift ∘ io.run_tactic'') $ do {
+          tactic.write ts',
+          tactic.interactive.recover,
+          tactic.num_goals
+        },
+        match n, n' with
         -- There is no more subgoals, check that the produce proof is valid.
-        | 0 := do {
+        | 0, 0 := do {
           finalize_proof req ts'
         }
+        | 0, (k+1) := do {
+        -- There are remaining subgoals, return the updated tactic state.
+          -- monad_lift $ io.run_tactic'' $ tactic.trace format! "REMAINING SUBGOALS: {n}",
+          tsid ← record_ts req.sid ts',
+          ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts'.fully_qualified >>= postprocess_tactic_state,
+          pure $ ⟨req.sid, tsid, ts_str, none⟩
+        }
         -- There are remaining subgoals, return the error.
-        | n := do {
+        | n, _ := do {
+          -- monad_lift $ io.put_str_ln' format! "FAILURE CASE N: {n}",
           state_t.lift $ do {
             let msg := (fn.get_or_else (λ _, format.of_string "n/a")) (),
             let err := format! "gen_tac_and_capture_res_failed: pos={pos} msg={msg}",

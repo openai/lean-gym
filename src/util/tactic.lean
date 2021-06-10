@@ -48,7 +48,7 @@ meta def validate_proof (tgt: expr) (pf: expr) : tactic unit := do {
     -- tactic.trace format!"PFT: {pft}",
     -- tactic.trace format!"TGT: {tgt}",
 
-    guard (bnot pf.has_meta_var),
+    guard (bnot pf.has_meta_var) <|> do {pf ← tactic.pp pf, tactic.fail format! "[validate_proof] proof contains metavariables {pf}"},
     tactic.guard_sorry pf,
     tactic.guard_undefined pf,
     tactic.is_def_eq tgt pft
