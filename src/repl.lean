@@ -257,7 +257,7 @@ meta def handle_run_tac
         }
         -- There are remaining subgoals, return the updated tactic state.
         | n := do {
-          monad_lift $ io.run_tactic'' $ tactic.trace format! "REMAINING SUBGOALS: {n}",
+          -- monad_lift $ io.run_tactic'' $ tactic.trace format! "REMAINING SUBGOALS: {n}",
           tsid ← record_ts req.sid ts',
           ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts'.fully_qualified >>= postprocess_tactic_state,
           pure $ ⟨req.sid, tsid, ts_str, none⟩
