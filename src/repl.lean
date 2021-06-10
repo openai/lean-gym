@@ -183,6 +183,7 @@ meta def handle_clear_search
    pure $ ⟨req.sid, none, none, none⟩ 
 }
 
+
 meta def finalize_proof
   (req : LeanREPLRequest)
   (ts': tactic_state) : LeanREPL LeanREPLResponse := do {

@@ -40,14 +40,17 @@ end tactic
 section validate
 
 meta def validate_proof (tgt: expr) (pf: expr) : tactic unit := do {
-    guard (bnot pf.has_meta_var),
-    tactic.guard_sorry pf,
-    tactic.guard_undefined pf,
+    -- pf ← tactic.instantiate_mvars pf,
     tactic.type_check pf,
     pft ← tactic.infer_type pf,
+    
     -- tactic.trace format!"PF: {pf}",
     -- tactic.trace format!"PFT: {pft}",
     -- tactic.trace format!"TGT: {tgt}",
+
+    guard (bnot pf.has_meta_var),
+    tactic.guard_sorry pf,
+    tactic.guard_undefined pf,
     tactic.is_def_eq tgt pft
 }
 
