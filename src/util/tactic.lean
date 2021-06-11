@@ -40,9 +40,9 @@ end tactic
 section validate
 
 meta def validate_proof (tgt: expr) (pf: expr) : tactic unit := do {
-    -- tactic.trace "VALIDATE PROOF",
-    tactic.type_check pf,
-    pft ← tactic.infer_type pf,
+    tactic.trace "VALIDATE PROOF",
+    tactic.type_check pf <|> tactic.fail format! "proof failed typechecking",
+    pft ← tactic.infer_type pf <|> tactic.fail format! "failed to infer type of proof term",
     
     -- tactic.trace format! "PF: {pf}",
 

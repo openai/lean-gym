@@ -111,9 +111,9 @@ namespace dict
     section formatting
         open format
         meta instance [has_to_string α] [has_to_string k] : has_to_string (dict k α) := ⟨λ d,  (λ s, "{" ++ s ++ "}") $ list.to_string $ dict.to_list $ d⟩
-        -- meta instance has_to_format [has_to_format α] [has_to_format k] : has_to_format (dict k α) := ⟨λ d,
-        --     to_fmt "{" ++ group (nest 1 $ join $ list.intersperse ("," ++ line) $ list.map (λ (p:k×α), to_fmt p.1 ++ " ↦ " ++ to_fmt p.2) $ dict.to_list d) ++ to_fmt "}"
-        -- ⟩
+        meta instance has_to_format [has_to_format α] [has_to_format k] : has_to_format (dict k α) := ⟨λ d,
+            to_fmt "{" ++ group (nest 1 $ join $ list.intersperse ("," ++ line) $ list.map (λ (p:k×α), to_fmt p.1 ++ " ↦ " ++ to_fmt p.2) $ dict.to_list d) ++ to_fmt "}"
+        ⟩
         meta instance has_to_tactic_format [has_to_tactic_format α] [has_to_tactic_format k] : has_to_tactic_format (dict k α) := ⟨λ d, do
             items ← list.mmap (λ (p:k×α), do f1 ← tactic.pp p.1, f2 ← tactic.pp p.2, pure $ f1 ++ line ++ "↦ " ++ nest 3 (f2)) (to_list d),
             pure $ "{" ++ group (nest 1 $ join $ list.intersperse ("," ++ line) $ items) ++ "}"

@@ -156,6 +156,7 @@ meta def handle_init_search
    -- generate a new tactic state.
    | tt := do {
      ts ← state_t.lift $ io.run_tactic'' $ do {
+       `[exact trivial] *> tactic.cleanup, -- get rid of the dummy goal
        env ← tactic.get_env,
        decl ← env.get decl_name,
        let g := decl.type,
@@ -183,7 +184,14 @@ meta def handle_clear_search
    pure $ ⟨req.sid, none, none, none⟩ 
 }
 
+meta def delay_pf (e : expr) : expr :=
+let thunk : unit → expr := λ _, e in
+(task.delay thunk).get
 
+meta def tactic.unfold_all_macros (e : expr) : tactic expr := do {
+  flip environment.unfold_all_macros e <$> tactic.get_env
+}
+#check expr
 meta def finalize_proof
   (req : LeanREPLRequest)
   (ts': tactic_state) : LeanREPL LeanREPLResponse := do {
@@ -199,10 +207,38 @@ meta def finalize_proof
       -- Set to tactic state index 0 to retrieve the meta-variable for the top goal.
       tactic.write ts₀,
       [g] ← tactic.get_goals,
-      tgt ← tactic.infer_type g,
       tactic.write ts',
-      pf ← tactic.get_assignment g >>= tactic.instantiate_mvars,
-      tactic.capture' (validate_proof tgt pf)
+      tgt ← tactic.infer_type g,
+      -- tactic.set_goals [g],
+      -- env ← tactic.get_env,
+      -- pf ← env.unfold_all_macros <$> tactic.get_assignment g,-
+      pf ← tactic.get_assignment g,
+      -- tactic.write ts₀,
+      tactic.pp pf >>= λ x, tactic.trace format! "PF BEFORE INSTANTIATION: {x}",
+      pf ← tactic.instantiate_mvars pf,
+      tactic.pp pf >>= λ x, tactic.trace format! "PF AFTER INSTANTIATION: {x}",
+     --  let rpf := ``(%%pf),
+     --  -- tactic.write ts₀,
+     --  tactic.set_goal_to `(true),
+     --  pf' ← tactic.to_expr rpf tt tt,
+     -- tactic.trace "VALIDATION FINISHED",
+     -- -- pf ← tactic.result,
+     -- -- tactic.trace rpf,
+     -- tactic.trace pf',
+     -- let pf' := delay_pf pf',
+     -- pf'' ← tactic.unfold_all_macros pf,
+     m ← tactic.mk_meta_var tgt,
+     -- (tactic.unify pf m tactic.transparency.all tt),
+    tactic.pp tgt >>= λ tgt, tactic.trace format! "TARGET: {tgt}",
+    tactic.unify pf m tactic.transparency.all tt,
+    tactic.read >>= λ x, tactic.trace format! "TACTIC STATE: {x}",
+     pf' ← tactic.get_assignment m >>= tactic.instantiate_mvars,
+     -- tactic.trace pf,
+     tactic.trace pf',
+      
+     -- -- pf' ← tactic.eval_expr rpf,
+      tactic.capture' $ validate_proof tgt pf'
+
     },
     match result with
     | (interaction_monad.result.success r s') := do {
@@ -274,7 +310,12 @@ meta def handle_run_tac
         match n with
         -- There is no more subgoals, check that the produced proof is valid.
         | 0 := do {
-          finalize_proof req ts'
+          -- finalize_proof req ts'
+          state_t.lift $ do {
+            let msg := (fn.get_or_else (λ _, format.of_string "n/a")) (),
+            let err := format! "gen_tac_and_capture_res_failed: pos={pos} msg={msg}",
+            pure ⟨none, none, none, some err.to_string⟩
+          }
         }
         -- There are remaining subgoals, return the error.
         | _ := do {
