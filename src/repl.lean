@@ -250,7 +250,7 @@ meta def handle_run_tac
         },
         -- monad_lift $ io.run_tactic'' $ tactic.trace format! "REMAINING SUBGOALS: {n}",
         match n with
-        -- There is no more subgoals, check that the produce proof is valid.
+        -- There is no more subgoals, check that the produced proof is valid.
         | 0 := do {
           finalize_proof req ts'
         }
@@ -272,7 +272,7 @@ meta def handle_run_tac
         },
         -- monad_lift $ io.run_tactic'' $ tactic.trace format! "REMAINING SUBGOALS: {n}",
         match n with
-        -- There is no more subgoals, check that the produce proof is valid.
+        -- There is no more subgoals, check that the produced proof is valid.
         | 0 := do {
           finalize_proof req ts'
         }
