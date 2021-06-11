@@ -62,19 +62,19 @@ meta instance : has_from_json LeanREPLRequest := ⟨λ msg, match msg with
   | (json.array [json.of_string cmd, json.array args]) := match cmd with
     | "run_tac" := match json.array args with
       | (json.array [json.of_string sid, json.of_string tsid, json.of_string tac]) := pure ⟨cmd, sid, tsid, tac, "", ""⟩
-      | exc := tactic.fail format!"[fatal] request_parsing_error: cmd={cmd} data={exc}"
+      | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
       end
     | "init_search" := match json.array args with
       | (json.array [json.of_string name, json.of_string open_ns]) := pure ⟨cmd, "", "", "", name, open_ns⟩
-      | exc := tactic.fail format!"[fatal] request_parsing_error: cmd={cmd} data={exc}"
+      | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
       end
     | "clear_search" := match json.array args with
       | (json.array [json.of_string sid]) := pure ⟨cmd, sid, "" , "", "", ""⟩
-      | exc := tactic.fail format!"[fatal] request_parsing_error: cmd={cmd} data={exc}"
+      | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
       end
-    | exc := tactic.fail format!"[fatal] request_parsing_error: data={exc}"
+    | exc := tactic.fail format!"request_parsing_error: data={exc}"
     end
-  | exc := tactic.fail format!"[fatal] request_parsing_error: data={exc}"
+  | exc := tactic.fail format!"request_parsing_error: data={exc}"
   end
 ⟩
 
