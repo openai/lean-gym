@@ -62,15 +62,15 @@ meta instance : has_from_json LeanREPLRequest := ⟨λ msg, match msg with
   | (json.array [json.of_string cmd, json.array args]) := match cmd with
     | "run_tac" := match json.array args with
       | (json.array [json.of_string sid, json.of_string tsid, json.of_string tac]) := pure ⟨cmd, sid, tsid, tac, "", ""⟩
-      | exc := tactic.fail format!"[fatal] request_parsing_error: cmd=run_tac data={exc}"
+      | exc := tactic.fail format!"[fatal] request_parsing_error: cmd={cmd} data={exc}"
       end
     | "init_search" := match json.array args with
       | (json.array [json.of_string name, json.of_string open_ns]) := pure ⟨cmd, "", "", "", name, open_ns⟩
-      | exc := tactic.fail format!"[fatal] request_parsing_error: cmd=init_theorem data={exc}"
+      | exc := tactic.fail format!"[fatal] request_parsing_error: cmd={cmd} data={exc}"
       end
     | "clear_search" := match json.array args with
       | (json.array [json.of_string sid]) := pure ⟨cmd, sid, "" , "", "", ""⟩
-      | exc := tactic.fail format!"[fatal] request_parsing_error: cmd=init_theorem data={exc}"
+      | exc := tactic.fail format!"[fatal] request_parsing_error: cmd={cmd} data={exc}"
       end
     | exc := tactic.fail format!"[fatal] request_parsing_error: data={exc}"
     end
@@ -211,7 +211,8 @@ meta def finalize_proof
       pure $ ⟨req.sid, tsid, ts_str, none⟩
     }
     | (interaction_monad.result.exception f p s') := do {
-      let err := format! "proof_validation_failed: proof is invalid or uses sorry",
+      let msg := (f.get_or_else (λ _, format.of_string "n/a")) (),
+      let err := format! "proof_validation_failed: msg={msg}",
       pure ⟨none, none, none, some err.to_string⟩
     }
     end
@@ -247,6 +248,7 @@ meta def handle_run_tac
           tactic.write ts',
           tactic.num_goals
         },
+        -- monad_lift $ io.run_tactic'' $ tactic.trace format! "REMAINING SUBGOALS: {n}",
         match n with
         -- There is no more subgoals, check that the produce proof is valid.
         | 0 := do {
@@ -268,13 +270,14 @@ meta def handle_run_tac
           tactic.write ts',
           tactic.num_goals
         },
+        -- monad_lift $ io.run_tactic'' $ tactic.trace format! "REMAINING SUBGOALS: {n}",
         match n with
         -- There is no more subgoals, check that the produce proof is valid.
         | 0 := do {
           finalize_proof req ts'
         }
         -- There are remaining subgoals, return the error.
-        | n := do {
+        | _ := do {
           state_t.lift $ do {
             let msg := (fn.get_or_else (λ _, format.of_string "n/a")) (),
             let err := format! "gen_tac_and_capture_res_failed: pos={pos} msg={msg}",

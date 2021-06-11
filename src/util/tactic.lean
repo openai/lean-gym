@@ -40,18 +40,28 @@ end tactic
 section validate
 
 meta def validate_proof (tgt: expr) (pf: expr) : tactic unit := do {
-    -- pf ← tactic.instantiate_mvars pf,
+    -- tactic.trace "VALIDATE PROOF",
     tactic.type_check pf,
     pft ← tactic.infer_type pf,
     
-    -- tactic.trace format!"PF: {pf}",
-    -- tactic.trace format!"PFT: {pft}",
-    -- tactic.trace format!"TGT: {tgt}",
+    -- tactic.trace format! "PF: {pf}",
 
-    guard (bnot pf.has_meta_var),
-    tactic.guard_sorry pf,
-    tactic.guard_undefined pf,
-    tactic.is_def_eq tgt pft
+    guard (bnot pf.has_meta_var) <|> do {
+      -- pfpp ← tactic.pp pf, 
+      -- tactic.trace format! "PF_PP: {pfpp}",
+      tactic.fail format! "proof contains metavariables"
+    },
+    tactic.guard_sorry pf <|> do {
+      tactic.fail format! "proof contains `sorry`"
+    },
+    tactic.guard_undefined pf <|> do {
+      tactic.fail format! "proof contains `undefined`"
+    },
+    tactic.is_def_eq tgt pft <|> do {
+      -- tactic.trace format!"PFT: {pft}",
+      -- tactic.trace format!"TGT: {tgt}",
+      tactic.fail format! "proof type mismatch"
+    }
 }
 
 meta def validate_decl (nm : name) : tactic unit := do {
