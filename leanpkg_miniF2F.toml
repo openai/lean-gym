@@ -6,5 +6,5 @@ path = "src"
 
 [dependencies]
 mathlib = { git = "https://github.com/leanprover-community/mathlib", rev = "9a8dcb9be408e7ae8af9f6832c08c021007f40ec" }
-minif2f = { git = "https://github.com/openai/miniF2F.git", rev = "455e25bc4b1822b605f243f76dc8fdb006879fdb" }
+minif2f = { git = "https://github.com/openai/miniF2F.git", rev = "9105ad30839c35f4d01047316da84669cf1d3ed3" }
 lean-gptf = { git = "https://github.com/jesse-michael-han/lean-gptf", rev = "a1a09952e0caa2f78ca104934c5d354322db11af" }
