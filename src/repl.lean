@@ -129,7 +129,6 @@ do lean.parser.run_with_input ident nm
 meta def parse_open_namespace (open_ns: string) : tactic (list name) :=
 do lean.parser.run_with_input (many ident) open_ns
 
-
 meta def handle_init_search
   (req : LeanREPLRequest)
   : LeanREPL LeanREPLResponse := do {
@@ -143,13 +142,16 @@ meta def handle_init_search
      parse_open_namespace req.open_ns
    },
    -- Check that the declaration is a theorem.
-   is_theorem ← state_t.lift $ io.run_tactic'' $ do {
-     tactic.is_theorem decl_name
-   } <|> pure ff,
+   ((is_theorem, err) : bool × format) ← state_t.lift $ io.run_tactic'' $ do {
+     env ← tactic.get_env,
+     is_thm ← (declaration.is_theorem <$> env.get decl_name)
+       | pure (ff, format! "theorem_not_in_environment: name={req.name} decl_name={decl_name}"),
+     let err := if !is_thm then format! "not_a_theorem: name={req.name} open_ns={req.open_ns}" else format! "",
+     pure $ (is_thm, err)
+  },
    match is_theorem with
    -- The declaration is not a theorem, return an error.
    | ff := do {
-     let err := format! "not_a_theorem: name={req.name} open_ns={req.open_ns}",
      pure ⟨none, none, none, some err.to_string⟩
    }
    -- The declaration is a theorem, set the env with open namespaces to it and
