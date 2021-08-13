@@ -144,11 +144,10 @@ meta def handle_init_search
    -- Check that the declaration is a theorem.
    ((is_theorem, err) : bool × format) ← state_t.lift $ io.run_tactic'' $ do {
      env ← tactic.get_env,
-     is_thm ← (declaration.is_theorem <$> env.get decl_name)
-       | pure (ff, format! "theorem_not_in_environment: name={req.name} decl_name={decl_name}"),
+     is_thm ← (declaration.is_theorem <$> env.get decl_name),
      let err := if !is_thm then format! "not_a_theorem: name={req.name} open_ns={req.open_ns}" else format! "",
      pure $ (is_thm, err)
-  },
+  } <|> pure (ff, format! "theorem_not_in_environment: name={req.name} decl_name={decl_name}"),
    match is_theorem with
    -- The declaration is not a theorem, return an error.
    | ff := do {
