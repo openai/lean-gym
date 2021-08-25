@@ -220,7 +220,6 @@ meta def finalize_proof
   end
 }
 
-
 meta def handle_run_tac
   (req : LeanREPLRequest)
   : LeanREPL LeanREPLResponse := do {
