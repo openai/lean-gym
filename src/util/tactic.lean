@@ -39,16 +39,24 @@ end tactic
 
 section validate
 
-meta def validate_proof (tgt: expr) (pf: expr) : tactic unit := do {
-    -- tactic.trace "VALIDATE PROOF",
-    tactic.type_check pf,
-    pft ← tactic.infer_type pf,
-    
-    -- tactic.trace format! "PF: {pf}",
+meta def kernel_type_check (pf : expr) : tactic unit := do {
+  tp ← tactic.infer_type pf,
+  env ← tactic.get_env,
+  let decl := (declaration.defn `_ (expr.collect_univ_params pf) tp pf reducibility_hints.opaque ff),
+  res ← tactic.capture' (env.add decl $> ()),
+  match res with
+  | (interaction_monad.result.success _ _) := pure ()
+  | (interaction_monad.result.exception msg _ _) := let msg := msg.get_or_else (λ _, ("" : format)) in
+    tactic.fail format! "kernel type check failed:\n---\n{msg ()}\n---\n"
+  end
+}
 
+meta def validate_proof (tgt: expr) (pf: expr) : tactic unit := do {
+    env ← tactic.get_env,
+    pf ← pure $ env.unfold_untrusted_macros pf,
+    pft ← tactic.infer_type pf,
+    tactic.type_check pf tactic.transparency.all,
     guard (bnot pf.has_meta_var) <|> do {
-      -- pfpp ← tactic.pp pf, 
-      -- tactic.trace format! "PF_PP: {pfpp}",
       tactic.fail format! "proof contains metavariables"
     },
     tactic.guard_sorry pf <|> do {
@@ -58,10 +66,11 @@ meta def validate_proof (tgt: expr) (pf: expr) : tactic unit := do {
       tactic.fail format! "proof contains `undefined`"
     },
     tactic.is_def_eq tgt pft <|> do {
-      -- tactic.trace format!"PFT: {pft}",
-      -- tactic.trace format!"TGT: {tgt}",
-      tactic.fail format! "proof type mismatch"
-    }
+      tgt_fmt ← tactic.pp tgt,
+      pft_fmt ← tactic.pp pft,
+      tactic.fail format! "proof type mismatch: {tgt_fmt} != {pft_fmt}"
+    },
+    kernel_type_check pf
 }
 
 meta def validate_decl (nm : name) : tactic unit := do {
