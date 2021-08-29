@@ -55,7 +55,6 @@ meta def validate_proof (tgt: expr) (pf: expr) : tactic unit := do {
     env ← tactic.get_env,
     pf ← pure $ env.unfold_untrusted_macros pf,
     pft ← tactic.infer_type pf,
-    tactic.set_goal_to tgt,
     tactic.type_check pf tactic.transparency.all,
     guard (bnot pf.has_meta_var) <|> do {
       tactic.fail format! "proof contains metavariables"
