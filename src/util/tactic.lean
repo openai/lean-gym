@@ -91,22 +91,6 @@ nms.mmap' add_open_namespace
 
 end add_open_namespace
 
-
-section hashing
-
-meta def tactic_hash : tactic ℕ := do {
-  gs ← tactic.get_goals,
-  hs ← gs.mmap $ λ g, do {
-    tactic.set_goals [g],
-    es ← (::) <$> tactic.target <*> tactic.local_context,
-    es.mfoldl (λ acc e, (+) acc <$> expr.hash <$> tactic.head_zeta e) 0
-  },
-  pure $ hs.sum
-}
-
-end hashing
-
-
 section misc
 
 meta def tactic.is_theorem (nm : name) : tactic bool := do {
