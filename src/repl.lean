@@ -43,8 +43,8 @@ meta structure LeanREPLState : Type :=
 
 namespace LeanREPLState
 
-meta def insert_ts (σ : LeanREPLState) (sid) (tsid) (ts) : LeanREPLState := 
-  ⟨dict.insert sid (dict.insert tsid ts (σ.1.get_default (dict.empty) sid)) σ.1, σ.2⟩ 
+meta def insert_ts (σ : LeanREPLState) (sid) (tsid) (ts) : LeanREPLState :=
+  ⟨dict.insert sid (dict.insert tsid ts (σ.1.get_default (dict.empty) sid)) σ.1, σ.2⟩
 
 meta def get_ts (σ : LeanREPLState) (sid) (tsid) : option tactic_state := (σ.1.get_default (dict.empty) sid).get tsid
 
@@ -54,7 +54,7 @@ meta def erase_search (σ : LeanREPLState) (sid) : LeanREPLState := ⟨σ.1.eras
 
 meta def get_next_sid (σ : LeanREPLState) : string := (format! "{σ.2}").to_string
 
-meta def incr_next_sid (σ : LeanREPLState) : LeanREPLState := ⟨σ.1, σ.2+1⟩ 
+meta def incr_next_sid (σ : LeanREPLState) : LeanREPLState := ⟨σ.1, σ.2+1⟩
 
 end LeanREPLState
 
@@ -180,7 +180,7 @@ meta def handle_clear_search
   : LeanREPL LeanREPLResponse := do {
    -- Simply remove the table associated with the provided search id from the state.
    modify $ λ σ, σ.erase_search req.sid,
-   pure $ ⟨req.sid, none, none, none⟩ 
+   pure $ ⟨req.sid, none, none, none⟩
 }
 
 

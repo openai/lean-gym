@@ -1,9 +1,0 @@
-[package]
-name = "lean-gym"
-version = "0.1"
-lean_version = "leanprover-community/lean:3.30.0"
-path = "src"
-
-[dependencies]
-lean-liquid = {git = "https://github.com/leanprover-community/lean-liquid", rev = "f81c00e92d239e8f4e573bf983d73d222fec1a5a"}
-lean-gptf = {git = "https://github.com/jesse-michael-han/lean-gptf", rev = "a1a09952e0caa2f78ca104934c5d354322db11af"}
