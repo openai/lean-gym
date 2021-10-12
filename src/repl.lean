@@ -220,6 +220,87 @@ meta def finalize_proof
   end
 }
 
+meta def add_conjecture (nm_str : string) (conj_str : string) : tactic (tactic_result string) := do {
+  let tac_str := format! "have {nm_str} : {conj_str}",
+  get_tac_and_capture_result tac_str.to_string 5000
+}
+
+/--
+  Forks the underlying tactic state; should only be used at the top level of LeanREPL.
+  `handle_conjecture` accepts a name and an expr, and internally applies a have-statement
+-/
+meta def handle_conjecture
+  (req : LeanREPLRequest)
+  : LeanREPL LeanREPLResponse := do {
+  σ ← get,
+  match (σ.get_ts req.sid req.tsid) with
+  -- Received an unknown search id, return an error.
+  | none := do {
+    let err := format! "unknown_id: search_id={req.sid} tactic_state_id={req.tsid}",
+    pure ⟨none, none, none, some err.to_string⟩
+  }
+  -- The tactic state was retrieved from the state.
+  | (some ts) := do {
+    -- Set the tactic state and try to apply the tactic.
+    (result_with_string : tactic_result string) ← state_t.lift $ io.run_tactic'' $ do {
+    sorry
+      -- tactic.write ts,
+      -- get_tac_and_capture_result req.tac 5000 <|> do {
+      --     let msg : format := format!"parse_itactic failed on `{req.tac}`",
+      --     interaction_monad.mk_exception msg none <$> tactic.read
+      -- }
+    },
+    match result_with_string with
+    -- The tactic application was successful.
+    | interaction_monad.result.success _ ts' := do {
+      sorry
+        -- n ← (state_t.lift ∘ io.run_tactic'') $ do {
+        --   tactic.write ts',
+        --   tactic.num_goals
+        -- },
+        -- -- monad_lift $ io.run_tactic'' $ tactic.trace format! "REMAINING SUBGOALS: {n}",
+        -- match n with
+        -- -- There is no more subgoals, check that the produced proof is valid.
+        -- | 0 := do {
+        --   finalize_proof req ts'
+        -- }
+        -- -- There are remaining subgoals, return the updated tactic state.
+        -- | n := do {
+        --   tsid ← record_ts req.sid ts',
+        --   ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts'.fully_qualified >>= postprocess_tactic_state,
+        --   pure $ ⟨req.sid, tsid, ts_str, none⟩
+        -- }
+        -- end
+      }
+    -- The tactic application failed, potentially return an error with the failure message.
+    | interaction_monad.result.exception fn pos ts' := do {
+        -- Some tactics such as linarith fail but result in a tactic state with no goals. Check if
+        -- that's the case and finalize the proof, otherwise error.
+        n ← (state_t.lift ∘ io.run_tactic'') $ do {
+          tactic.write ts',
+          tactic.num_goals
+        },
+        -- monad_lift $ io.run_tactic'' $ tactic.trace format! "REMAINING SUBGOALS: {n}",
+        match n with
+        -- There is no more subgoals, check that the produced proof is valid.
+        | 0 := do {
+          finalize_proof req ts'
+        }
+        -- There are remaining subgoals, return the error.
+        | _ := do {
+          state_t.lift $ do {
+            let msg := (fn.get_or_else (λ _, format.of_string "n/a")) (),
+            let err := format! "gen_tac_and_capture_res_failed: pos={pos} msg={msg}",
+            pure ⟨none, none, none, some err.to_string⟩
+          }
+        }
+        end
+      }
+    end
+  }
+  end
+}
+
 
 meta def handle_run_tac
   (req : LeanREPLRequest)
@@ -297,6 +378,7 @@ match req.cmd with
 | "run_tac" := handle_run_tac req
 | "init_search" := handle_init_search req
 | "clear_search" := handle_clear_search req
+| "conjecture" := handle_conjecture req
 | exc := state_t.lift $ io.fail' format! "[fatal] unknown_command: cmd={exc}"
 end
 
