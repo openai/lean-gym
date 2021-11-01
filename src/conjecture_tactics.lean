@@ -72,13 +72,36 @@ meta def tac₂ (conj_pf : expr) (narrowed_ts : tactic_state) : tactic (name × 
   `tac₃` should take the old_ts emitted by `tac₁`, looks up the declaration `nm` in `new_ts`'s environment, and uses it to prove the open conjecture which is the top-level goal of `old_ts`, and then returns `old_ts` after this modification. this represents the rest of the proof search after the conjecture been "re-injected".
 -/
 meta def tac₃ (old_ts : tactic_state) (nm : name) (new_ts : tactic_state) : tactic tactic_state := do {
+  -- Look up decl in new ts env
   old_gs ← tactic.get_goals,
   tactic.write new_ts,
   modified_env ← tactic.get_env, 
   d ← modified_env.get nm,
 
-  sorry
+  -- Use decl to close goal of old_ts
+  tactic.write old_ts,
+  result ← tactic.capture' $ pure d.value >>= tactic.exact,
+  new_ts ← ( match result with 
+  | interaction_monad.result.success _ ts' := do { 
+    tactic.write ts',
+    tactic.read
+    }
+  | interaction_monad.result.exception fn _ _ := do {
+    let thunk := fn.get_or_else (λ _, format! "exception"),
+    tactic.fail format! "{thunk ()}"
+  } end),
+  return new_ts
 }
+
+-- meta def test_tact₂ : tactic unit :=  do {
+--   let pf_term : expr := `(trivial),
+--   ts ← tactic.read,
+--   ⟨nm, new_ts⟩ ← tac₂, pf_term ts,
+--   tactic.write new_ts,
+--   env ← tactic.get_env,
+--   decl ← env.get nm,
+--   pure ()
+--   }
 
 end tactic.interactive
 
