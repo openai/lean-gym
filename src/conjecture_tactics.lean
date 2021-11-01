@@ -38,7 +38,7 @@ meta def name_conj (old : name) (new : option name := none) : tactic name :=
     match old.components.reverse with
     | last :: most := (do let last := last.to_string,
                          tactic.get_unused_name $ mk_str_name old.get_prefix last ++ "_conjecture")
-    | nil          := undefined
+    | nil := undefined
     end
   | (some new) := return (mk_str_name old.get_prefix new.to_string)
 end
@@ -93,15 +93,15 @@ meta def tac₃ (old_ts : tactic_state) (nm : name) (new_ts : tactic_state) : ta
   return new_ts
 }
 
--- meta def test_tact₂ : tactic unit :=  do {
---   let pf_term : expr := `(trivial),
---   ts ← tactic.read,
---   ⟨nm, new_ts⟩ ← tac₂, pf_term ts,
---   tactic.write new_ts,
---   env ← tactic.get_env,
---   decl ← env.get nm,
---   pure ()
---   }
+meta def test_tac₂ : tactic unit := do { 
+  let pf_term : expr := `(trivial),
+  ts ← tactic.read, 
+  ⟨nm ,new_ts⟩ ← tac₂ pf_term ts,
+  tactic.write new_ts, 
+  env ← tactic.get_env, 
+  decl ← env.get nm, -- succeeds iff `nm` is inside `env` 
+  pure () 
+  }
 
 end tactic.interactive
 
@@ -112,5 +112,8 @@ run_cmd (do {
   tactic.trace "\n----\n",
   tactic.trace ts_narrowed,
   new_name ← tactic.interactive.name_conj "test_name" none,
-  tactic.trace new_name
+  tactic.trace new_name,
+  tactic.trace "\n----\n",
+  tactic.interactive.test_tac₂ *> tactic.trace "OK"
+  
 })
