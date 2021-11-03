@@ -50,7 +50,6 @@ end
 meta def tac₂ (conj_pf : expr) (narrowed_ts : tactic_state) : tactic (name × tactic_state) := do {
   tp ← tactic.infer_type conj_pf,
   env ← tactic.get_env,
-  -- TODO (Kudzo) decl should accept new name from name_conj
   let decl := (declaration.defn `_ (expr.collect_univ_params conj_pf) tp conj_pf reducibility_hints.opaque ff),
   res ← tactic.capture' (env.add decl $> ()),
   modified_ts ← (match res with 
@@ -92,6 +91,7 @@ meta def tac₃ (old_ts : tactic_state) (nm : name) (new_ts : tactic_state) : ta
   return new_ts
 }
 
+
 meta def test_tac₂ : tactic unit := do { 
   let pf_term : expr := `(trivial),
   ts ← tactic.read, 
@@ -102,17 +102,25 @@ meta def test_tac₂ : tactic unit := do {
   pure () 
   }
 
+meta def test_tac₃ (pf_term : expr) : tactic unit  := do {
+⟨ts_old, ts_narrowed⟩ ←  tactic.interactive.tac₁ "h" "false",
+tactic.write ts_old, -- ts_old has two goals ⊢false and ⊢true
+
+⟨nm ,new_ts⟩ ← tac₂ pf_term ts_narrowed,
+final_ts ← tac₃ ts_old nm  new_ts,
+tactic.write final_ts,
+tactic.get_goal *> tactic.trace "tac₃ OK"  -- succeeds if new tactic state only has one goal
+}
+
+
 end tactic.interactive
+
 
 -- e.g.
 run_cmd (do {
-  ⟨ts_old, ts_narrowed⟩ ←  tactic.interactive.tac₁ "h" "false",
-  tactic.trace ts_old,
+  
   tactic.trace "\n----\n",
-  tactic.trace ts_narrowed,
-  new_name ← tactic.interactive.name_conj "test_name" none,
-  tactic.trace new_name,
-  tactic.trace "\n----\n",
-  tactic.interactive.test_tac₂ *> tactic.trace "OK"
+  tactic.interactive.test_tac₃ `(sorry : false)
+  
   
 })
