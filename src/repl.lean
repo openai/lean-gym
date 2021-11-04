@@ -14,6 +14,7 @@ import util.tactic
 import tactic.gptf.utils.util
 import basic.table
 import tactic.gptf.basic
+import basic.conjecture_tactics
 
 
 section main
@@ -61,6 +62,10 @@ end LeanREPLState
 meta instance : has_from_json LeanREPLRequest := ⟨λ msg, match msg with
   | (json.array [json.of_string cmd, json.array args]) := match cmd with
     | "run_tac" := match json.array args with
+      | (json.array [json.of_string sid, json.of_string tsid, json.of_string tac]) := pure ⟨cmd, sid, tsid, tac, "", ""⟩
+      | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
+      end
+    | "conjecture" := match json.array args with
       | (json.array [json.of_string sid, json.of_string tsid, json.of_string tac]) := pure ⟨cmd, sid, tsid, tac, "", ""⟩
       | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
       end
@@ -220,10 +225,6 @@ meta def finalize_proof
   end
 }
 
-meta def add_conjecture (nm_str : string) (conj_str : string) : tactic (tactic_result string) := do {
-  let tac_str := format! "have {nm_str} : {conj_str}",
-  get_tac_and_capture_result tac_str.to_string 5000
-}
 
 /--
   Forks the underlying tactic state; should only be used at the top level of LeanREPL.
@@ -241,62 +242,7 @@ meta def handle_conjecture
   }
   -- The tactic state was retrieved from the state.
   | (some ts) := do {
-    -- Set the tactic state and try to apply the tactic.
-    (result_with_string : tactic_result string) ← state_t.lift $ io.run_tactic'' $ do {
     sorry
-      -- tactic.write ts,
-      -- get_tac_and_capture_result req.tac 5000 <|> do {
-      --     let msg : format := format!"parse_itactic failed on `{req.tac}`",
-      --     interaction_monad.mk_exception msg none <$> tactic.read
-      -- }
-    },
-    match result_with_string with
-    -- The tactic application was successful.
-    | interaction_monad.result.success _ ts' := do {
-      sorry
-        -- n ← (state_t.lift ∘ io.run_tactic'') $ do {
-        --   tactic.write ts',
-        --   tactic.num_goals
-        -- },
-        -- -- monad_lift $ io.run_tactic'' $ tactic.trace format! "REMAINING SUBGOALS: {n}",
-        -- match n with
-        -- -- There is no more subgoals, check that the produced proof is valid.
-        -- | 0 := do {
-        --   finalize_proof req ts'
-        -- }
-        -- -- There are remaining subgoals, return the updated tactic state.
-        -- | n := do {
-        --   tsid ← record_ts req.sid ts',
-        --   ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts'.fully_qualified >>= postprocess_tactic_state,
-        --   pure $ ⟨req.sid, tsid, ts_str, none⟩
-        -- }
-        -- end
-      }
-    -- The tactic application failed, potentially return an error with the failure message.
-    | interaction_monad.result.exception fn pos ts' := do {
-        -- Some tactics such as linarith fail but result in a tactic state with no goals. Check if
-        -- that's the case and finalize the proof, otherwise error.
-        n ← (state_t.lift ∘ io.run_tactic'') $ do {
-          tactic.write ts',
-          tactic.num_goals
-        },
-        -- monad_lift $ io.run_tactic'' $ tactic.trace format! "REMAINING SUBGOALS: {n}",
-        match n with
-        -- There is no more subgoals, check that the produced proof is valid.
-        | 0 := do {
-          finalize_proof req ts'
-        }
-        -- There are remaining subgoals, return the error.
-        | _ := do {
-          state_t.lift $ do {
-            let msg := (fn.get_or_else (λ _, format.of_string "n/a")) (),
-            let err := format! "gen_tac_and_capture_res_failed: pos={pos} msg={msg}",
-            pure ⟨none, none, none, some err.to_string⟩
-          }
-        }
-        end
-      }
-    end
   }
   end
 }
@@ -389,7 +335,6 @@ meta def parse_request (msg : string) : io LeanREPLRequest := do {
   | none := io.fail' format! "[fatal] parse_failed: data={msg}"
   end
 }
-
 
 meta def loop : LeanREPL unit := do {
   req ← (state_t.lift $ io.get_line >>= parse_request),
