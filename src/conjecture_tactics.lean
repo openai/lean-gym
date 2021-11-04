@@ -113,14 +113,29 @@ tactic.get_goal *> tactic.trace "tac₃ OK"  -- succeeds if new tactic state onl
 }
 
 
-end tactic.interactive
+/--
+  Meant to test all conjecture tactics  proves that 0 = 1 -> 0 = 2 by conjecturing that 0 = 1 -> false and then using false.elim
+-/
+meta def test_all_conjecture_tactics: tactic unit := do {
+  ⟨ts_old, ts_narrowed⟩ ← tac₁ "h" "0 = 1 -> false",
 
+  let pf_term : expr := `(λ h, @nat.no_confusion false 0 1 h) ,
+  ⟨nm ,new_ts⟩ ← tac₂ pf_term ts_narrowed,
 
--- e.g.
+  final_ts ← tac₃ ts_old nm  new_ts,
+  tactic.write final_ts,
+  pure ()
+}
+
+lemma dummy_lemma : 0 = 2 :=
+begin
+  test_all_conjecture_tactics,
+  exact false.elim <_>
+end
+
 run_cmd (do {
-  
+
   tactic.trace "\n----\n",
   tactic.interactive.test_tac₃ `(sorry : false)
-  
-  
+ 
 })
