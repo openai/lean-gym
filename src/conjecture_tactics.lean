@@ -127,11 +127,13 @@ meta def test_all_conjecture_tactics: tactic unit := do {
   pure ()
 }
 
-lemma dummy_lemma : 0 = 2 :=
-begin
-  test_all_conjecture_tactics,
-  exact false.elim <_>
-end
+  lemma dummy_lemma : (0 = 1) → (0 = 2) :=
+  begin
+    test_all_conjecture_tactics,
+    intro h',
+    exact false.elim (h h'),
+  end
+end tactic.interactive
 
 run_cmd (do {
 
