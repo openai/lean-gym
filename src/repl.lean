@@ -240,7 +240,7 @@ meta def parse_conjecture_str (conj_str: list string) : LeanREPL (string × stri
 
 /--
   Forks the underlying tactic state; should only be used at the top level of LeanREPL.
-  `handle_conjecture` accepts a name and an expr, and internally applies a have-statement
+  `handle_conjecture`
 -/
 meta def handle_conjecture
   (req : LeanREPLRequest)
@@ -258,21 +258,21 @@ meta def handle_conjecture
       | ("conjecture" :: rest) := do {
         ⟨conj_nm, conj_str ⟩ ←  parse_conjecture_str rest,
         ts_narrowed ← (state_t.lift ∘ io.run_tactic'') $ do {
+          tactic.write ts,
           ⟨ ts_old, ts_narrowed ⟩ ← add_conjecture conj_nm conj_str,
-          tactic.write ts_narrowed,
-          tactic.read
+          pure ts_narrowed
         },
         tsid ← record_ts req.sid ts_narrowed,
         ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts_narrowed.fully_qualified >>= postprocess_tactic_state,
         pure $ ⟨req.sid, tsid, ts_str, none⟩
       }
-      -- resume proofsearch by just assumming the given conjecture is true
-      | ("resume" :: rest) := do {
+      -- resume proofsearch by just assumming the given conjecture is true using the dangerous_assume_conjecture tactic
+      | ("assume" :: rest) := do {
         ⟨conj_nm, conj_str ⟩ ←  parse_conjecture_str rest,
         ts_dangerous ← (state_t.lift ∘ io.run_tactic'') $ do {
+          tactic.write ts,
           dangerous_ts ← dangerous_assume_conjecture conj_nm conj_str,
-          tactic.write dangerous_ts,
-          tactic.read
+          pure dangerous_ts
         },
         tsid ← record_ts req.sid ts_dangerous,
         ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts_dangerous.fully_qualified >>= postprocess_tactic_state,
