@@ -9,6 +9,31 @@ Helper tactics for conjecturing
 import tactic
 import tactic.gptf.basic
 import util.tactic
+
+/--
+Does bad things. Accepts a conjecture and just adds it to the tactic state without proof
+-/
+meta def dangerous_assume_conjecture (nm_str : string) (conj_str: string): tactic unit := do {
+  let tac_str := format! "have {nm_str} : {conj_str}",
+  result ← get_tac_and_capture_result tac_str.to_string 5000,
+  return_result ← (match result with 
+    | interaction_monad.result.success _ ts' := do {
+      ts_final ← do {
+        tactic.write ts',
+        (g1 :: gs) ← tactic.get_goals,
+        tactic.set_goals gs,
+        tactic.read
+      },
+      pure ()
+    }
+    | interaction_monad.result.exception fn pos ts' := do {
+      let thunk := fn.get_or_else (λ _, format! "exception"),
+      tactic.fail format! "{thunk ()}"
+    }
+  end),
+  pure return_result
+}
+
 /--
   Given a conjecture name and string, returns old tactic state, narrowed tactic state
 -/
