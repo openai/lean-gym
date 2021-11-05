@@ -225,6 +225,18 @@ meta def finalize_proof
   end
 }
 
+/--
+  Parses command strings from handle_conjecture
+-/
+meta def parse_conjecture_str (conj_str: list string) : LeanREPL (string × string) := do {
+  result ← (match conj_str with 
+    | (conj_name :: conj_str :: []) := do {
+      pure $ prod.mk conj_name conj_str
+    }
+    | otherwise := do {state_t.lift $ io.fail' $ format! "conjecutre str could not be properly deconstructed"}
+    end),
+  pure result
+}
 
 /--
   Forks the underlying tactic state; should only be used at the top level of LeanREPL.
@@ -235,14 +247,43 @@ meta def handle_conjecture
   : LeanREPL LeanREPLResponse := do {
   σ ← get,
   match (σ.get_ts req.sid req.tsid) with
-  -- Received an unknown search id, return an error.
   | none := do {
     let err := format! "unknown_id: search_id={req.sid} tactic_state_id={req.tsid}",
     pure ⟨none, none, none, some err.to_string⟩
   }
-  -- The tactic state was retrieved from the state.
   | (some ts) := do {
-    sorry
+    let command_str := req.tac.split (= ','),
+    match command_str with 
+      -- start conjecturing by taking in a conjecture name and conjecture string and using the add_conjecture tactic
+      | ("conjecture" :: rest) := do {
+        ⟨conj_nm, conj_str ⟩ ←  parse_conjecture_str rest,
+        ts_narrowed ← (state_t.lift ∘ io.run_tactic'') $ do {
+          ⟨ ts_old, ts_narrowed ⟩ ← add_conjecture conj_nm conj_str,
+          tactic.write ts_narrowed,
+          tactic.read
+        },
+        tsid ← record_ts req.sid ts_narrowed,
+        ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts_narrowed.fully_qualified >>= postprocess_tactic_state,
+        pure $ ⟨req.sid, tsid, ts_str, none⟩
+      }
+      -- resume proofsearch by just assumming the given conjecture is true
+      | ("resume" :: rest) := do {
+        ⟨conj_nm, conj_str ⟩ ←  parse_conjecture_str rest,
+        ts_dangerous ← (state_t.lift ∘ io.run_tactic'') $ do {
+          dangerous_ts ← dangerous_assume_conjecture conj_nm conj_str,
+          tactic.write dangerous_ts,
+          tactic.read
+        },
+        tsid ← record_ts req.sid ts_dangerous,
+        ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts_dangerous.fully_qualified >>= postprocess_tactic_state,
+        pure $ ⟨req.sid, tsid, ts_str, none⟩
+      }
+      -- otherwise we've recieved something not in the specification --> fail
+      | otherwise := do {
+        let err := format! "input to handle_conjecture not recognized",
+        pure ⟨none, none, none, some err.to_string⟩
+      }
+      end
   }
   end
 }
