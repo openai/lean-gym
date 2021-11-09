@@ -65,7 +65,11 @@ meta instance : has_from_json LeanREPLRequest := ⟨λ msg, match msg with
       | (json.array [json.of_string sid, json.of_string tsid, json.of_string tac]) := pure ⟨cmd, sid, tsid, tac, "", ""⟩
       | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
       end
-    | "conjecture" := match json.array args with
+    | "conjecture_add" := match json.array args with
+      | (json.array [json.of_string sid, json.of_string tsid, json.of_string tac]) := pure ⟨cmd, sid, tsid, tac, "", ""⟩
+      | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
+      end
+    | "conjecture_assume" := match json.array args with
       | (json.array [json.of_string sid, json.of_string tsid, json.of_string tac]) := pure ⟨cmd, sid, tsid, tac, "", ""⟩
       | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
       end
@@ -226,19 +230,6 @@ meta def finalize_proof
 }
 
 /--
-  Parses command strings from handle_conjecture
--/
-meta def parse_conjecture_str (conj_str: list string) : LeanREPL (string × string) := do {
-  result ← (match conj_str with 
-    | (conj_name :: conj_str :: []) := do {
-      pure $ prod.mk conj_name conj_str
-    }
-    | otherwise := do {state_t.lift $ io.fail' $ format! "conjecutre str could not be properly deconstructed"}
-    end),
-  pure result
-}
-
-/--
   Forks the underlying tactic state; should only be used at the top level of LeanREPL.
   `handle_conjecture`
 -/
@@ -252,42 +243,45 @@ meta def handle_conjecture
     pure ⟨none, none, none, some err.to_string⟩
   }
   | (some ts) := do {
-    let command_str := req.tac.split (= ','),
-    match command_str with 
+    let conj_str := req.tac,
       -- start conjecturing by taking in a conjecture name and conjecture string and using the add_conjecture tactic
-      | ("conjecture" :: rest) := do {
-        ⟨conj_nm, conj_str ⟩ ←  parse_conjecture_str rest,
-        ts_narrowed ← (state_t.lift ∘ io.run_tactic'') $ do {
-          tactic.write ts,
-          ⟨ ts_old, ts_narrowed ⟩ ← add_conjecture conj_nm conj_str,
-          pure ts_narrowed
-        },
-        tsid ← record_ts req.sid ts_narrowed,
-        ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts_narrowed.fully_qualified >>= postprocess_tactic_state,
-        pure $ ⟨req.sid, tsid, ts_str, none⟩
-      }
-      -- resume proofsearch by just assumming the given conjecture is true using the dangerous_assume_conjecture tactic
-      | ("assume" :: rest) := do {
-        ⟨conj_nm, conj_str ⟩ ←  parse_conjecture_str rest,
-        ts_dangerous ← (state_t.lift ∘ io.run_tactic'') $ do {
-          tactic.write ts,
-          dangerous_ts ← dangerous_assume_conjecture conj_nm conj_str,
-          pure dangerous_ts
-        },
-        tsid ← record_ts req.sid ts_dangerous,
-        ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts_dangerous.fully_qualified >>= postprocess_tactic_state,
-        pure $ ⟨req.sid, tsid, ts_str, none⟩
-      }
-      -- otherwise we've recieved something not in the specification --> fail
-      | otherwise := do {
-        let err := format! "input to handle_conjecture not recognized",
-        pure ⟨none, none, none, some err.to_string⟩
-      }
-      end
+    ts_narrowed ← (state_t.lift ∘ io.run_tactic'') $ do {
+      tactic.write ts,
+      ⟨ ts_old, ts_narrowed ⟩ ← add_conjecture conj_str,
+      pure ts_narrowed
+    },
+    tsid ← record_ts req.sid ts_narrowed,
+    ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts_narrowed.fully_qualified >>= postprocess_tactic_state,
+    pure $ ⟨req.sid, tsid, ts_str, none⟩
+
   }
   end
 }
 
+meta def handle_assume
+  (req : LeanREPLRequest)
+  : LeanREPL LeanREPLResponse := do {
+  σ ← get,
+  match (σ.get_ts req.sid req.tsid) with
+  | none := do {
+    let err := format! "unknown_id: search_id={req.sid} tactic_state_id={req.tsid}",
+    pure ⟨none, none, none, some err.to_string⟩
+  }
+  | (some ts) := do {
+    let conj_str := req.tac,
+        -- resume proofsearch by just assumming the given conjecture is true using the dangerous_assume_conjecture tactic
+    ts_dangerous ← (state_t.lift ∘ io.run_tactic'') $ do {
+      tactic.write ts,
+      dangerous_ts ← dangerous_assume_conjecture conj_str,
+      pure dangerous_ts
+    },
+    tsid ← record_ts req.sid ts_dangerous,
+    ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts_dangerous.fully_qualified >>= postprocess_tactic_state,
+    pure $ ⟨req.sid, tsid, ts_str, none⟩
+
+  }
+   end
+  }
 
 meta def handle_run_tac
   (req : LeanREPLRequest)
@@ -365,7 +359,8 @@ match req.cmd with
 | "run_tac" := handle_run_tac req
 | "init_search" := handle_init_search req
 | "clear_search" := handle_clear_search req
-| "conjecture" := handle_conjecture req
+| "conjecture_add" := handle_conjecture req
+| "conjecture_assume" := handle_assume req
 | exc := state_t.lift $ io.fail' format! "[fatal] unknown_command: cmd={exc}"
 end
 
