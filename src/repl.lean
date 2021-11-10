@@ -13,8 +13,8 @@ import util.io
 import util.tactic
 import tactic.gptf.utils.util
 import basic.table
-import tactic.gptf.basic
 import basic.conjecture_tactics
+import tactic.gptf.basic
 
 
 section main
@@ -229,6 +229,7 @@ meta def finalize_proof
   end
 }
 
+
 /--
   Forks the underlying tactic state; should only be used at the top level of LeanREPL.
   `handle_conjecture`
@@ -250,9 +251,14 @@ meta def handle_conjecture
       ⟨ ts_old, ts_narrowed ⟩ ← add_conjecture conj_str,
       pure ts_narrowed
     },
-    tsid ← record_ts req.sid ts_narrowed,
+
+    -- Create a new search id 
+    let sid := σ.get_next_sid,
+    modify $ λ σ, σ.incr_next_sid,
+  
+    tsid ← record_ts sid ts_narrowed,
     ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts_narrowed.fully_qualified >>= postprocess_tactic_state,
-    pure $ ⟨req.sid, tsid, ts_str, none⟩
+    pure $ ⟨sid, tsid, ts_str, none⟩
 
   }
   end
@@ -275,9 +281,14 @@ meta def handle_assume
       dangerous_ts ← dangerous_assume_conjecture conj_str,
       pure dangerous_ts
     },
-    tsid ← record_ts req.sid ts_dangerous,
+
+    -- Create a new search id
+    let sid := σ.get_next_sid,
+    modify $ λ σ, σ.incr_next_sid,
+
+    tsid ← record_ts sid ts_dangerous,
     ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts_dangerous.fully_qualified >>= postprocess_tactic_state,
-    pure $ ⟨req.sid, tsid, ts_str, none⟩
+    pure $ ⟨sid, tsid, ts_str, none⟩
 
   }
    end
@@ -372,6 +383,7 @@ meta def parse_request (msg : string) : io LeanREPLRequest := do {
   end
 }
 
+
 meta def loop : LeanREPL unit := do {
   req ← (state_t.lift $ io.get_line >>= parse_request),
   res ← handle_request req,
@@ -381,5 +393,6 @@ meta def loop : LeanREPL unit := do {
 meta def main : io unit := do {
   state_t.run loop.forever ⟨dict.empty, 0⟩ $> ()
 }
+
 
 end main

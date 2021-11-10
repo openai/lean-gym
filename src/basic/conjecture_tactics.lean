@@ -2,19 +2,15 @@
 Copyright (c) 2021 OpenAI. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Author(s): Kudzo Ahegbebu, Jesse Michael Han
-
 Helper tactics for conjecturing
 -/
-
 import tactic
 import tactic.gptf.basic
-import util.tactic
 
 /--
 Does bad things. Accepts a conjecture and just adds it to the tactic state without proof
 -/
 meta def dangerous_assume_conjecture (conj_str: string): tactic tactic_state := do {
-  ts_old ← tactic.read,
   conj_name ← tactic.get_unused_name "h",
   let tac_str := format! "have {conj_name} : {conj_str}",
   result ← get_tac_and_capture_result tac_str.to_string 5000,
@@ -33,10 +29,11 @@ meta def dangerous_assume_conjecture (conj_str: string): tactic tactic_state := 
       tactic.fail format! "{thunk ()}"
     }
   end),
-  tactic.write ts_old,
-  pure return_result
+  tactic.write return_result,
+  tactic.revert_target_deps,
+  ts ← tactic.read,
+  pure ts
 }
-
 /--
   Given a conjecture name and string, returns old tactic state, narrowed tactic state
 -/
@@ -51,6 +48,8 @@ meta def add_conjecture (conj_str : string) : tactic (tactic_state × tactic_sta
     tactic.write ts',
     g ← list.head <$> tactic.get_goals,
     tactic.set_goals [g],
+    tactic.revert_target_deps,
+    tactic.intros,
     tactic.read
   },
   pure $ prod.mk ts' ts_narrowed
@@ -64,4 +63,3 @@ meta def add_conjecture (conj_str : string) : tactic (tactic_state × tactic_sta
   tactic.write ts_old,
   pure return_result
 } 
-

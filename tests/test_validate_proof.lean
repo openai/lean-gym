@@ -1,5 +1,4 @@
 import util.tactic
-import basic.conjecture_tactics
 
 meta def should_fail
   (u v : ℕ+)
