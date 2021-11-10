@@ -49,7 +49,6 @@ meta def add_conjecture (conj_str : string) : tactic (tactic_state × tactic_sta
     g ← list.head <$> tactic.get_goals,
     tactic.set_goals [g],
     tactic.revert_target_deps,
-    tactic.intros,
     tactic.read
   },
   pure $ prod.mk ts' ts_narrowed
