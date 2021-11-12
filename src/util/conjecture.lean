@@ -10,7 +10,7 @@ import tactic.gptf.basic
 /--
 Does bad things. Accepts a conjecture and just adds it to the tactic state without proof
 -/
-meta def dangerous_assume_conjecture (conj_str: string): tactic tactic_state := do {
+meta def assume_conjecture (conj_str: string): tactic tactic_state := do {
   conj_name ← tactic.get_unused_name "h",
   let tac_str := format! "have {conj_name} : {conj_str}",
   result ← get_tac_and_capture_result tac_str.to_string 5000,

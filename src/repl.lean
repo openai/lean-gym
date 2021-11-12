@@ -11,9 +11,9 @@ import data.string.basic
 import all
 import util.io
 import util.tactic
+import util.conjecture
 import tactic.gptf.utils.util
 import basic.table
-import basic.conjecture_tactics
 import tactic.gptf.basic
 
 
@@ -29,6 +29,7 @@ meta structure LeanREPLRequest : Type :=
 (tac: string)
 (name: string)
 (open_ns: string)
+(term: string)
 
 
 meta structure LeanREPLResponse : Type :=
@@ -62,23 +63,23 @@ end LeanREPLState
 meta instance : has_from_json LeanREPLRequest := ⟨λ msg, match msg with
   | (json.array [json.of_string cmd, json.array args]) := match cmd with
     | "run_tac" := match json.array args with
-      | (json.array [json.of_string sid, json.of_string tsid, json.of_string tac]) := pure ⟨cmd, sid, tsid, tac, "", ""⟩
+      | (json.array [json.of_string sid, json.of_string tsid, json.of_string tac]) := pure ⟨cmd, sid, tsid, tac, "", "", ""⟩
       | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
       end
-    | "conjecture_add" := match json.array args with
-      | (json.array [json.of_string sid, json.of_string tsid, json.of_string tac]) := pure ⟨cmd, sid, tsid, tac, "", ""⟩
+    | "conjecture_set" := match json.array args with
+      | (json.array [json.of_string sid, json.of_string tsid, json.of_string term]) := pure ⟨cmd, sid, tsid, "", "", "", term⟩
       | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
       end
     | "conjecture_assume" := match json.array args with
-      | (json.array [json.of_string sid, json.of_string tsid, json.of_string tac]) := pure ⟨cmd, sid, tsid, tac, "", ""⟩
+      | (json.array [json.of_string sid, json.of_string tsid, json.of_string term]) := pure ⟨cmd, sid, tsid, "", "", "", term⟩
       | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
       end
     | "init_search" := match json.array args with
-      | (json.array [json.of_string name, json.of_string open_ns]) := pure ⟨cmd, "", "", "", name, open_ns⟩
+      | (json.array [json.of_string name, json.of_string open_ns]) := pure ⟨cmd, "", "", "", name, open_ns, ""⟩
       | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
       end
     | "clear_search" := match json.array args with
-      | (json.array [json.of_string sid]) := pure ⟨cmd, sid, "" , "", "", ""⟩
+      | (json.array [json.of_string sid]) := pure ⟨cmd, sid, "" , "", "", "", ""⟩
       | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
       end
     | exc := tactic.fail format!"request_parsing_error: data={exc}"
@@ -244,22 +245,23 @@ meta def handle_conjecture
     pure ⟨none, none, none, some err.to_string⟩
   }
   | (some ts) := do {
-    let conj_str := req.tac,
-      -- start conjecturing by taking in a conjecture name and conjecture string and using the add_conjecture tactic
+    let conj_str := req.term,
+    -- Start a conjectured proof search by taking in a conjecture name and conjecture string and
+    -- using the add_conjecture tactic.
     ts_narrowed ← (state_t.lift ∘ io.run_tactic'') $ do {
       tactic.write ts,
       ⟨ ts_old, ts_narrowed ⟩ ← add_conjecture conj_str,
       pure ts_narrowed
     },
 
-    -- Create a new search id 
+    -- Create a new search id, this is required so that the final check are only run on the narrowed
+    -- tactic state.
     let sid := σ.get_next_sid,
     modify $ λ σ, σ.incr_next_sid,
-  
+
     tsid ← record_ts sid ts_narrowed,
     ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts_narrowed.fully_qualified >>= postprocess_tactic_state,
     pure $ ⟨sid, tsid, ts_str, none⟩
-
   }
   end
 }
@@ -274,22 +276,22 @@ meta def handle_assume
     pure ⟨none, none, none, some err.to_string⟩
   }
   | (some ts) := do {
-    let conj_str := req.tac,
-        -- resume proofsearch by just assumming the given conjecture is true using the dangerous_assume_conjecture tactic
-    ts_dangerous ← (state_t.lift ∘ io.run_tactic'') $ do {
+    let conj_str := req.term,
+    -- Start a proof search with an assumed hypothesis using the assume_conjecture tactic.
+    ts_assumed ← (state_t.lift ∘ io.run_tactic'') $ do {
       tactic.write ts,
-      dangerous_ts ← dangerous_assume_conjecture conj_str,
-      pure dangerous_ts
+      assumed_ts ← assume_conjecture conj_str,
+      pure assumed_ts
     },
 
-    -- Create a new search id
+    -- Create a new search id, this is required so that the final check are only run on the
+    -- "assumed" tactic state (tactic state with additional assumption)
     let sid := σ.get_next_sid,
     modify $ λ σ, σ.incr_next_sid,
 
-    tsid ← record_ts sid ts_dangerous,
-    ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts_dangerous.fully_qualified >>= postprocess_tactic_state,
+    tsid ← record_ts sid ts_assumed,
+    ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts_assumed.fully_qualified >>= postprocess_tactic_state,
     pure $ ⟨sid, tsid, ts_str, none⟩
-
   }
    end
   }
@@ -370,7 +372,7 @@ match req.cmd with
 | "run_tac" := handle_run_tac req
 | "init_search" := handle_init_search req
 | "clear_search" := handle_clear_search req
-| "conjecture_add" := handle_conjecture req
+| "conjecture_set" := handle_conjecture req
 | "conjecture_assume" := handle_assume req
 | exc := state_t.lift $ io.fail' format! "[fatal] unknown_command: cmd={exc}"
 end
