@@ -315,7 +315,7 @@ meta def handle_assume
           tactic.read
         },
         -- Create a new search id, this is required so that the final check are only run on the
-        -- "assumed" tactic state (tactic state with additional assumption)
+        -- "assumed" tactic state (tactic state with additional assumption only).
         let sid := σ.get_next_sid,
         modify $ λ σ, σ.incr_next_sid,
 
