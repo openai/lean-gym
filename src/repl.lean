@@ -435,5 +435,4 @@ meta def main : io unit := do {
   state_t.run loop.forever ⟨dict.empty, 0⟩ $> ()
 }
 
-
 end main

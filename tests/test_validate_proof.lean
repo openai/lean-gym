@@ -17,7 +17,6 @@ end
 
 meta def should_succeed : true := by trivial
 
-
 meta def main : io unit := io.run_tactic'' $ do {
   (tactic.guard_undefined `(undefined : ℕ) <|> tactic.trace "OK"),
   (tactic.guard_sorry `(sorry : ℕ) <|> tactic.trace "OK"),
