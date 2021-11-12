@@ -11,7 +11,6 @@ import data.string.basic
 import all
 import util.io
 import util.tactic
-import util.conjecture
 import tactic.gptf.utils.util
 import basic.table
 import tactic.gptf.basic
