@@ -243,6 +243,7 @@ meta def handle_conjecture
     let conj_str := req.term,
     -- Use `have` to introduce the new assumption
     result_with_string ← state_t.lift $ io.run_tactic'' $ do {
+      tactic.write ts,
       conj_name ← tactic.get_unused_name "h",
       let tac_str := format! "have {conj_name} : {conj_str}",
       get_tac_and_capture_result tac_str.to_string 5000 <|> do {
@@ -295,6 +296,7 @@ meta def handle_assume
     let conj_str := req.term,
     -- Use `have` to introduce the new assumption
     result_with_string ← state_t.lift $ io.run_tactic'' $ do {
+      tactic.write ts,
       conj_name ← tactic.get_unused_name "h",
       let tac_str := format! "have {conj_name} : {conj_str}",
       get_tac_and_capture_result tac_str.to_string 5000 <|> do {
