@@ -258,7 +258,9 @@ meta def handle_conjecture
           tactic.write ts',
           g ← list.head <$> tactic.get_goals,
           tactic.set_goals [g],
-          tactic.revert_target_deps,
+          -- We need to revert all hypotheses, otherwise proof finalization will complain with
+          -- unknown variables.
+          tactic.revert_all,
           tactic.read
         },
         -- Create a new search id, this is required so that the final check are only run on the
@@ -311,7 +313,9 @@ meta def handle_assume
           tactic.write ts',
           (g1 :: gs) ← tactic.get_goals,
           tactic.set_goals gs,
-          tactic.revert_target_deps,
+          -- We need to revert all hypotheses, otherwise proof finalization will complain with
+          -- unknown variables.
+          tactic.revert_all,
           tactic.read
         },
         -- Create a new search id, this is required so that the final check are only run on the
