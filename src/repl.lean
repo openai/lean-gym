@@ -28,6 +28,7 @@ meta structure LeanREPLRequest : Type :=
 (tac: string)
 (name: string)
 (open_ns: string)
+(term: string)
 
 
 meta structure LeanREPLResponse : Type :=
@@ -61,15 +62,23 @@ end LeanREPLState
 meta instance : has_from_json LeanREPLRequest := ⟨λ msg, match msg with
   | (json.array [json.of_string cmd, json.array args]) := match cmd with
     | "run_tac" := match json.array args with
-      | (json.array [json.of_string sid, json.of_string tsid, json.of_string tac]) := pure ⟨cmd, sid, tsid, tac, "", ""⟩
+      | (json.array [json.of_string sid, json.of_string tsid, json.of_string tac]) := pure ⟨cmd, sid, tsid, tac, "", "", ""⟩
+      | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
+      end
+    | "conjecture_set" := match json.array args with
+      | (json.array [json.of_string sid, json.of_string tsid, json.of_string term]) := pure ⟨cmd, sid, tsid, "", "", "", term⟩
+      | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
+      end
+    | "conjecture_assume" := match json.array args with
+      | (json.array [json.of_string sid, json.of_string tsid, json.of_string term]) := pure ⟨cmd, sid, tsid, "", "", "", term⟩
       | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
       end
     | "init_search" := match json.array args with
-      | (json.array [json.of_string name, json.of_string open_ns]) := pure ⟨cmd, "", "", "", name, open_ns⟩
+      | (json.array [json.of_string name, json.of_string open_ns]) := pure ⟨cmd, "", "", "", name, open_ns, ""⟩
       | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
       end
     | "clear_search" := match json.array args with
-      | (json.array [json.of_string sid]) := pure ⟨cmd, sid, "" , "", "", ""⟩
+      | (json.array [json.of_string sid]) := pure ⟨cmd, sid, "" , "", "", "", ""⟩
       | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
       end
     | exc := tactic.fail format!"request_parsing_error: data={exc}"
@@ -220,6 +229,115 @@ meta def finalize_proof
   end
 }
 
+meta def handle_conjecture
+  (req : LeanREPLRequest)
+  : LeanREPL LeanREPLResponse := do {
+  σ ← get,
+  match (σ.get_ts req.sid req.tsid) with
+  | none := do {
+    let err := format! "unknown_id: search_id={req.sid} tactic_state_id={req.tsid}",
+    pure ⟨none, none, none, some err.to_string⟩
+  }
+  | (some ts) := do {
+    let conj_str := req.term,
+    -- Use `have` to introduce the new assumption
+    result_with_string ← state_t.lift $ io.run_tactic'' $ do {
+      tactic.write ts,
+      conj_name ← tactic.get_unused_name "h",
+      let tac_str := format! "have {conj_name} : {conj_str}",
+      get_tac_and_capture_result tac_str.to_string 5000 <|> do {
+          let msg : format := format!"parse_itactic failed on `{req.tac}`",
+          interaction_monad.mk_exception msg none <$> tactic.read
+      }
+    },
+    match result_with_string with
+    -- `have` was successful.
+    | interaction_monad.result.success _ ts' := do {
+        -- Narrow the tactic state to the assumption only
+        ts_narrowed ← (state_t.lift ∘ io.run_tactic'') $ do {
+          tactic.write ts',
+          g ← list.head <$> tactic.get_goals,
+          tactic.set_goals [g],
+          -- We need to revert all hypotheses, otherwise proof finalization will complain with
+          -- unknown variables.
+          tactic.revert_all,
+          tactic.read
+        },
+        -- Create a new search id, this is required so that the final check are only run on the
+        -- "narrowed" tactic state (tactic state of the conjecture only).
+        let sid := σ.get_next_sid,
+        modify $ λ σ, σ.incr_next_sid,
+
+        tsid ← record_ts sid ts_narrowed,
+        ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts_narrowed.fully_qualified >>= postprocess_tactic_state,
+        pure $ ⟨sid, tsid, ts_str, none⟩
+    }
+    | interaction_monad.result.exception fn pos ts' := do {
+      state_t.lift $ do {
+        let msg := (fn.get_or_else (λ _, format.of_string "n/a")) (),
+        let err := format! "conjecture_set_have_failed: pos={pos} msg={msg}",
+        pure ⟨none, none, none, some err.to_string⟩
+      }
+    }
+    end
+  }
+  end
+}
+
+meta def handle_assume
+  (req : LeanREPLRequest)
+  : LeanREPL LeanREPLResponse := do {
+  σ ← get,
+  match (σ.get_ts req.sid req.tsid) with
+  | none := do {
+    let err := format! "unknown_id: search_id={req.sid} tactic_state_id={req.tsid}",
+    pure ⟨none, none, none, some err.to_string⟩
+  }
+  | (some ts) := do {
+    let conj_str := req.term,
+    -- Use `have` to introduce the new assumption
+    result_with_string ← state_t.lift $ io.run_tactic'' $ do {
+      tactic.write ts,
+      conj_name ← tactic.get_unused_name "h",
+      let tac_str := format! "have {conj_name} : {conj_str}",
+      get_tac_and_capture_result tac_str.to_string 5000 <|> do {
+          let msg : format := format!"parse_itactic failed on `{req.tac}`",
+          interaction_monad.mk_exception msg none <$> tactic.read
+      }
+    },
+    match result_with_string with
+    -- `have` was successful.
+    | interaction_monad.result.success _ ts' := do {
+        -- Narrow the tactic state to the initial goal with assumption.
+        ts_assumed ← (state_t.lift ∘ io.run_tactic'') $ do {
+          tactic.write ts',
+          (g1 :: gs) ← tactic.get_goals,
+          tactic.set_goals gs,
+          -- We need to revert all hypotheses, otherwise proof finalization will complain with
+          -- unknown variables.
+          tactic.revert_all,
+          tactic.read
+        },
+        -- Create a new search id, this is required so that the final check are only run on the
+        -- "assumed" tactic state (tactic state with additional assumption only).
+        let sid := σ.get_next_sid,
+        modify $ λ σ, σ.incr_next_sid,
+
+        tsid ← record_ts sid ts_assumed,
+        ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts_assumed.fully_qualified >>= postprocess_tactic_state,
+        pure $ ⟨sid, tsid, ts_str, none⟩
+    }
+    | interaction_monad.result.exception fn pos ts' := do {
+      state_t.lift $ do {
+        let msg := (fn.get_or_else (λ _, format.of_string "n/a")) (),
+        let err := format! "conjecture_assume_have_failed: pos={pos} msg={msg}",
+        pure ⟨none, none, none, some err.to_string⟩
+      }
+    }
+    end
+  }
+  end
+}
 
 meta def handle_run_tac
   (req : LeanREPLRequest)
@@ -297,6 +415,8 @@ match req.cmd with
 | "run_tac" := handle_run_tac req
 | "init_search" := handle_init_search req
 | "clear_search" := handle_clear_search req
+| "conjecture_set" := handle_conjecture req
+| "conjecture_assume" := handle_assume req
 | exc := state_t.lift $ io.fail' format! "[fatal] unknown_command: cmd={exc}"
 end
 
