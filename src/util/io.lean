@@ -28,9 +28,13 @@ meta def run_tactic'' {α} (tac :tactic α) : io α := do {
   }
 }
 
+
 meta def fail' {α} (fmt : format) : io α := io.fail $ format.to_string fmt
 
 meta def put_str_ln' : Π (fmt : format), io unit := io.put_str_ln ∘ format.to_string
+
+meta def run_tac {α : Type} (ts : tactic_state) (tac : tactic α) : io α :=
+  run_tactic'' (do tactic.write ts, tac)
 
 end io
 end io
@@ -42,3 +46,5 @@ meta def list.nth_except {α} : list α → ℕ → string → io α := λ xs po
   | none := do
     io.fail' format!"must supply {msg} as argument {pos}"
   end
+
+

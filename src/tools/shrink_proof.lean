@@ -10,20 +10,6 @@ import data.list.basic
 import util.tactic
 import tactic.gptf.utils.util
 
-meta def io.run_tac {α : Type} (ts : tactic_state) (tac : tactic α) : io α :=
-  io.run_tactic'' (do tactic.write ts, tac)
-
-meta def expr.mvar_id : expr → name
-| (expr.mvar unique _ _) := unique
-| _ := `error.not_an_mvar
-
-meta def build_proof_trace (ts₀ : tactic_state) (steps : list (string × tactic_state)) : list (tactic_state × string × tactic_state) :=
-  list.reverse $ prod.snd $ @list.foldl (tactic_state × list (tactic_state × string × tactic_state)) 
-    (string × tactic_state) 
-    (λ ⟨ts_prev, new_steps⟩ ⟨action, ts_next⟩, (ts_next, new_steps.cons (ts_prev, action, ts_next))) 
-    (ts₀, []) 
-    steps 
-
 /--
 Consider the following proof:
 ```
@@ -66,13 +52,10 @@ meta def strip_unused_haves (ts_final : tactic_state) (steps : list (tactic_stat
   pure (steps.take bad_idx ++ steps.drop resume_idx)
 }
 
-meta def shrink_proof_aux : list (tactic_state × string × tactic_state) → io (list (tactic_state × string × tactic_state)) 
+meta def shrink_proof : list (tactic_state × string × tactic_state) → io (list (tactic_state × string × tactic_state)) 
 | [] := io.fail "shrink_proof called on empty proof"
 | steps := do
   let ts_final := (steps.last sorry).snd.snd,
-  io.run_tac ts_final tactic.done,
+  io.run_tac ts_final (do tactic.trace_state, tactic.done),
   ⟨fewer_steps, success⟩ ← io.catch (do steps ← strip_unused_haves ts_final steps, pure (steps, tt)) (λ e, pure (steps, ff)),
-  if success then shrink_proof_aux fewer_steps else pure fewer_steps
-  
-meta def shrink_proof (ts₀ : tactic_state) (steps : list (string × tactic_state)) : io (list (tactic_state × string × tactic_state)) :=
-  shrink_proof_aux (build_proof_trace ts₀ steps)
+  if success then shrink_proof fewer_steps else pure fewer_steps

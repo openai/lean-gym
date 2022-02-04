@@ -27,7 +27,6 @@ meta structure LeanREPLRequest : Type :=
 (name: string)
 (open_ns: string)
 (term: string)
-(proof_steps: list (string × string)) -- for proof minimization
 
 meta structure LeanREPLResponse : Type :=
 (sid : option string)
@@ -37,16 +36,24 @@ meta structure LeanREPLResponse : Type :=
 (proof_steps : list string)
 
 
+meta structure parent : Type :=
+(tsid : string)
+(action : string)
+
 meta structure LeanREPLState : Type :=
-(state : dict string (dict string tactic_state))
+(state : dict string (dict string (tactic_state × option parent)))
 (next_sid : ℕ)
 
 namespace LeanREPLState
 
-meta def insert_ts (σ : LeanREPLState) (sid) (tsid) (ts) : LeanREPLState :=
-  ⟨dict.insert sid (dict.insert tsid ts (σ.1.get_default (dict.empty) sid)) σ.1, σ.2⟩
+meta def insert_ts (σ : LeanREPLState) (sid) (tsid) (ts) (parent : option parent): LeanREPLState :=
+  ⟨dict.insert sid (dict.insert tsid (ts, parent) (σ.1.get_default (dict.empty) sid)) σ.1, σ.2⟩
 
-meta def get_ts (σ : LeanREPLState) (sid) (tsid) : option tactic_state := (σ.1.get_default (dict.empty) sid).get tsid
+meta def get_ts_parents (σ : LeanREPLState) (sid) (tsid) : option (tactic_state × option parent) := 
+  (σ.1.get_default (dict.empty) sid).get tsid
+
+meta def get_ts (σ : LeanREPLState) (sid) (tsid) : option tactic_state := 
+  option.map prod.fst $ σ.get_ts_parents sid tsid
 
 meta def get_next_tsid (σ : LeanREPLState) (sid) : string := (format! "{(σ.1.get_default (dict.empty) sid).size}").to_string
 
@@ -61,32 +68,28 @@ end LeanREPLState
 meta instance : has_from_json LeanREPLRequest := ⟨λ msg, match msg with
   | (json.array [json.of_string cmd, json.array args]) := match cmd with
     | "run_tac" := match json.array args with
-      | (json.array [json.of_string sid, json.of_string tsid, json.of_string tac]) := pure ⟨cmd, sid, tsid, tac, "", "", "", []⟩
+      | (json.array [json.of_string sid, json.of_string tsid, json.of_string tac]) := pure ⟨cmd, sid, tsid, tac, "", "", ""⟩
       | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
       end
     | "conjecture_set" := match json.array args with
-      | (json.array [json.of_string sid, json.of_string tsid, json.of_string term]) := pure ⟨cmd, sid, tsid, "", "", "", term, []⟩
+      | (json.array [json.of_string sid, json.of_string tsid, json.of_string term]) := pure ⟨cmd, sid, tsid, "", "", "", term⟩
       | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
       end
     | "conjecture_assume" := match json.array args with
-      | (json.array [json.of_string sid, json.of_string tsid, json.of_string term]) := pure ⟨cmd, sid, tsid, "", "", "", term, []⟩
+      | (json.array [json.of_string sid, json.of_string tsid, json.of_string term]) := pure ⟨cmd, sid, tsid, "", "", "", term⟩
       | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
       end
     | "init_search" := match json.array args with
-      | (json.array [json.of_string name, json.of_string open_ns]) := pure ⟨cmd, "", "", "", name, open_ns, "", []⟩
+      | (json.array [json.of_string name, json.of_string open_ns]) := pure ⟨cmd, "", "", "", name, open_ns, ""⟩
       | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
       end
     | "clear_search" := match json.array args with
-      | (json.array [json.of_string sid]) := pure ⟨cmd, sid, "" , "", "", "", "", []⟩
+      | (json.array [json.of_string sid]) := pure ⟨cmd, sid, "" , "", "", "", ""⟩
       | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
       end
     | "shrink_proof" := match json.array args with
-      | (json.array [json.of_string sid, json.array proof_steps_j]) := do
-        proof_steps : list (string × string) ← proof_steps_j.mmap (λ psj, match psj with
-          | (json.array [json.of_string action, json.of_string tsid]) := pure (action, tsid)
-          | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
-          end),
-        pure ⟨cmd, sid, "" , "", "", "", "", proof_steps⟩
+      | (json.array [json.of_string sid, json.of_string tsid]) := do
+        pure ⟨cmd, sid, tsid , "", "", "", ""⟩
       | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
       end      
     | exc := tactic.fail format!"request_parsing_error: data={exc}"
@@ -107,10 +110,10 @@ meta def LeanREPL.forever (x : LeanREPL unit) : LeanREPL unit := do
   },
   state_t.lift $ io.fail' $ format! "[LeanREPL.forever] unreachable code"
 
-meta def record_ts {m} [monad m] (sid: string) (ts : tactic_state) : (state_t LeanREPLState m) string := do {
+meta def record_ts {m} [monad m] (sid: string) (ts : tactic_state) (parent : option parent) : (state_t LeanREPLState m) string := do {
   σ ← get,
   let tsid := σ.get_next_tsid sid,
-  modify $ λ σ, σ.insert_ts sid tsid ts,
+  modify $ λ σ, σ.insert_ts sid tsid ts parent,
   pure tsid
 }
 
@@ -185,7 +188,7 @@ meta def handle_init_search
      },
      let sid := σ.get_next_sid,
      modify $ λ σ, σ.incr_next_sid,
-     tsid ← record_ts sid ts,
+     tsid ← record_ts sid ts none,
      ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts.fully_qualified >>= postprocess_tactic_state,
      pure $ ⟨sid, tsid, ts_str, none, []⟩
    }
@@ -224,7 +227,7 @@ meta def finalize_proof
     },
     match result with
     | (interaction_monad.result.success r s') := do {
-      tsid ← record_ts req.sid ts',
+      tsid ← record_ts req.sid ts' (some ⟨req.tsid, req.tac⟩),
       ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts'.fully_qualified >>= postprocess_tactic_state,
       pure $ ⟨req.sid, tsid, ts_str, none, []⟩
     }
@@ -277,7 +280,7 @@ meta def handle_conjecture
         let sid := σ.get_next_sid,
         modify $ λ σ, σ.incr_next_sid,
 
-        tsid ← record_ts sid ts_narrowed,
+        tsid ← record_ts sid ts_narrowed none,
         ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts_narrowed.fully_qualified >>= postprocess_tactic_state,
         pure $ ⟨sid, tsid, ts_str, none, []⟩
     }
@@ -293,24 +296,43 @@ meta def handle_conjecture
   end
 }
 
+meta def collect_proof_steps_aux (σ : LeanREPLState) (sid : string) : Π (tsid : string), io (list (tactic_state × string × tactic_state))
+| tsid2 := do
+  match σ.get_ts_parents sid tsid2 with
+  | none := io.fail "collect_proof_steps: invalid tsid"
+  | (some ⟨ts2, parent⟩) := 
+    match parent with
+    | none := if tsid2 = "0" then pure [] else io.fail "no parent"
+    | (some ⟨tsid1, action⟩) :=
+      match σ.get_ts sid tsid1 with 
+      | none := io.fail "parent doesn't exist"      
+      | (some ts1) := do {
+        rest ← collect_proof_steps_aux tsid1,
+        pure (⟨ts1, action, ts2⟩ :: rest)
+      } 
+      end
+    end
+  end
+
+meta def collect_proof_steps (σ : LeanREPLState) (sid tsid : string) : io (list (tactic_state × string × tactic_state)) := do
+  rev_steps ← collect_proof_steps_aux σ sid tsid,
+  pure $ list.reverse rev_steps
+
 meta def handle_shrink_proof
   (req : LeanREPLRequest)
   : LeanREPL LeanREPLResponse := do {
+  state_t.lift $ io.print_ln "handle_shrink_proof",
   σ ← get,
-  match (σ.get_ts req.sid "0") with
+  match (σ.get_ts req.sid req.tsid) with
   | none := do {
     let err := format! "unknown_id: search_id={req.sid} tactic_state_id={req.tsid}",
     pure ⟨none, none, none, some err.to_string, []⟩
   }
-  | (some ts) := do {
-    let steps := req.proof_steps.map (λ ⟨action, tsid⟩, (action, σ.get_ts req.sid tsid)),
-    if steps.any (λ ⟨_, ts⟩, ts.is_none) then do {
-      let err := format! "tsid does not exist",
-      pure ⟨none, none, none, some err.to_string, []⟩
-    } else do {
-      new_steps ← state_t.lift $ shrink_proof ts (steps.map (λ ⟨action, otsid⟩, (action, @option.get _ otsid sorry))),
-      pure ⟨none, none, none, none, new_steps.map (λ ⟨_, action, _⟩, action)⟩
-    }
+  | (some ts_final) := do {
+    state_t.lift $ io.run_tac ts_final (do tactic.trace_state, gs ← tactic.get_goals, tactic.trace gs.length, tactic.done),
+    steps ← state_t.lift $ collect_proof_steps σ req.sid req.tsid,
+    new_steps ← state_t.lift (shrink_proof steps),
+    pure ⟨none, none, none, none, new_steps.map (λ ⟨_, action, _⟩, action)⟩
   }
   end
   }
@@ -354,7 +376,7 @@ meta def handle_assume
         let sid := σ.get_next_sid,
         modify $ λ σ, σ.incr_next_sid,
 
-        tsid ← record_ts sid ts_assumed,
+        tsid ← record_ts sid ts_assumed (some ⟨req.tsid, req.tac⟩),
         ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts_assumed.fully_qualified >>= postprocess_tactic_state,
         pure $ ⟨sid, tsid, ts_str, none, []⟩
     }
@@ -405,7 +427,7 @@ meta def handle_run_tac
         }
         -- There are remaining subgoals, return the updated tactic state.
         | n := do {
-          tsid ← record_ts req.sid ts',
+          tsid ← record_ts req.sid ts' (some ⟨req.tsid, req.tac⟩),
           ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts'.fully_qualified >>= postprocess_tactic_state,
           pure $ ⟨req.sid, tsid, ts_str, none, []⟩
         }
