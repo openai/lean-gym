@@ -128,7 +128,7 @@ meta structure dictd (k : Type) (α : Type) : Type :=
 namespace dictd
   variables {k : Type} [has_lt k] [decidable_rel ((<) : k → k → Prop)] {α : Type}
   meta def empty (default : k → α) : dictd k α := ⟨dict.empty, default⟩
-  meta instance [inhabited α] : has_emptyc (dictd k α) := ⟨empty (λ _, inhabited.default α)⟩
+  meta instance [inhabited α] : has_emptyc (dictd k α) := ⟨empty (λ _, arbitrary α)⟩
   meta def get (key : k) (dd : dictd k α) : α := dict.get_default (dd.2 key) key dd.1
   meta def insert (key : k) (a : α) (dd : dictd k α) : dictd k α := ⟨dict.insert key a dd.1, dd.2⟩
   meta def modify (f : α → α) (key : k) (dd : dictd k α) : dictd k α := ⟨dict.modify (λ o, f $ option.get_or_else o (dd.2 key)) key dd.1, dd.2⟩
@@ -195,7 +195,7 @@ namespace mtable
     meta def join : mtable κ → mtable κ → mtable κ := dict.merge_with (λ _, (+))
     meta def to_table : mtable κ → table κ := dict.map (λ _, ⟨⟩)
     meta def filter (f : κ → bool) : mtable κ → mtable κ := dict.filter $ λ k _, f k
-    meta instance : has_coe_to_fun (mtable κ) := ⟨λ _, κ → ℕ, λ t k, get k t⟩
+    meta instance : has_coe_to_fun (mtable κ) (λ _, κ → ℕ ):= ⟨λ t k, get k t⟩
     open format
     meta instance [has_to_tactic_format κ] : has_to_tactic_format (mtable κ) :=
     ⟨λ t, do

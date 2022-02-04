@@ -1,10 +1,10 @@
 [package]
 name = "lean-gym"
 version = "0.1"
-lean_version = "leanprover-community/lean:3.33.0"
+lean_version = "leanprover-community/lean:3.38.0"
 path = "src"
 
 [dependencies]
-mathlib = { git = "https://github.com/leanprover-community/mathlib", rev = "2fd713a76e15eebdcdfd2f94472584b3f5f2bfc7" }
-minif2f = { git = "https://github.com/openai/miniF2F.git", rev = "18369de8966f03e15af60fb0c101dc234a7dbd9d" }
-lean-gptf = { git = "https://github.com/jesse-michael-han/lean-gptf", rev = "e2adeef81f6cf089cde493fa1b7f4af5d53c747a" }
+mathlib = { git = "https://github.com/leanprover-community/mathlib", rev = "30a731ca565b92955e40274652f4c2b6f4db79f4" }
+minif2f = { git = "https://github.com/openai/miniF2F.git", rev = "9b00e8ba0b52836177fb3a6a0d1a5a945144bb61" }
+lean-gptf = { git = "https://github.com/dselsam/lean-gptf", rev = "a2cc99dc6575633f9582a5cea539fb26b88e2699" }
