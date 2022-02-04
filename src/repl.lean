@@ -12,7 +12,7 @@ import all
 import util.io
 import util.tactic
 import basic.table
-
+import tools.shrink_proof
 
 section main
 
@@ -27,13 +27,14 @@ meta structure LeanREPLRequest : Type :=
 (name: string)
 (open_ns: string)
 (term: string)
-
+(proof_steps: list (string × string)) -- for proof minimization
 
 meta structure LeanREPLResponse : Type :=
 (sid : option string)
 (tsid : option string)
 (tactic_state : option string)
 (error: option string)
+(proof_steps : list string)
 
 
 meta structure LeanREPLState : Type :=
@@ -60,25 +61,34 @@ end LeanREPLState
 meta instance : has_from_json LeanREPLRequest := ⟨λ msg, match msg with
   | (json.array [json.of_string cmd, json.array args]) := match cmd with
     | "run_tac" := match json.array args with
-      | (json.array [json.of_string sid, json.of_string tsid, json.of_string tac]) := pure ⟨cmd, sid, tsid, tac, "", "", ""⟩
+      | (json.array [json.of_string sid, json.of_string tsid, json.of_string tac]) := pure ⟨cmd, sid, tsid, tac, "", "", "", []⟩
       | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
       end
     | "conjecture_set" := match json.array args with
-      | (json.array [json.of_string sid, json.of_string tsid, json.of_string term]) := pure ⟨cmd, sid, tsid, "", "", "", term⟩
+      | (json.array [json.of_string sid, json.of_string tsid, json.of_string term]) := pure ⟨cmd, sid, tsid, "", "", "", term, []⟩
       | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
       end
     | "conjecture_assume" := match json.array args with
-      | (json.array [json.of_string sid, json.of_string tsid, json.of_string term]) := pure ⟨cmd, sid, tsid, "", "", "", term⟩
+      | (json.array [json.of_string sid, json.of_string tsid, json.of_string term]) := pure ⟨cmd, sid, tsid, "", "", "", term, []⟩
       | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
       end
     | "init_search" := match json.array args with
-      | (json.array [json.of_string name, json.of_string open_ns]) := pure ⟨cmd, "", "", "", name, open_ns, ""⟩
+      | (json.array [json.of_string name, json.of_string open_ns]) := pure ⟨cmd, "", "", "", name, open_ns, "", []⟩
       | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
       end
     | "clear_search" := match json.array args with
-      | (json.array [json.of_string sid]) := pure ⟨cmd, sid, "" , "", "", "", ""⟩
+      | (json.array [json.of_string sid]) := pure ⟨cmd, sid, "" , "", "", "", "", []⟩
       | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
       end
+    | "shrink_proof" := match json.array args with
+      | (json.array [json.of_string sid, json.array proof_steps_j]) := do
+        proof_steps : list (string × string) ← proof_steps_j.mmap (λ psj, match psj with
+          | (json.array [json.of_string action, json.of_string tsid]) := pure (action, tsid)
+          | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
+          end),
+        pure ⟨cmd, sid, "" , "", "", "", "", proof_steps⟩
+      | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
+      end      
     | exc := tactic.fail format!"request_parsing_error: data={exc}"
     end
   | exc := tactic.fail format!"request_parsing_error: data={exc}"
@@ -105,7 +115,7 @@ meta def record_ts {m} [monad m] (sid: string) (ts : tactic_state) : (state_t Le
 }
 
 meta def LeanREPLResponse.to_json: LeanREPLResponse → json
-| ⟨sid, tsid, ts, err⟩ :=
+| ⟨sid, tsid, ts, err, steps⟩ :=
     json.object [
       ⟨"search_id", match sid with
         | none := json.null
@@ -122,7 +132,8 @@ meta def LeanREPLResponse.to_json: LeanREPLResponse → json
       ⟨"error", match err with
         | none := json.null
         | some err := json.of_string err
-        end⟩
+        end⟩,
+      ⟨"proof_steps", json.array (steps.map json.of_string)⟩
     ]
 
 meta instance : has_to_format LeanREPLResponse :=
@@ -157,7 +168,7 @@ meta def handle_init_search
    -- The declaration is not a theorem, return an error.
    | ff := do {
      let err := format! "not_a_theorem: name={req.name} open_ns={req.open_ns}",
-     pure ⟨none, none, none, some err.to_string⟩
+     pure ⟨none, none, none, some err.to_string, []⟩
    }
    -- The declaration is a theorem, set the env with open namespaces to it and
    -- generate a new tactic state.
@@ -176,7 +187,7 @@ meta def handle_init_search
      modify $ λ σ, σ.incr_next_sid,
      tsid ← record_ts sid ts,
      ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts.fully_qualified >>= postprocess_tactic_state,
-     pure $ ⟨sid, tsid, ts_str, none⟩
+     pure $ ⟨sid, tsid, ts_str, none, []⟩
    }
    end
 }
@@ -187,7 +198,7 @@ meta def handle_clear_search
   : LeanREPL LeanREPLResponse := do {
    -- Simply remove the table associated with the provided search id from the state.
    modify $ λ σ, σ.erase_search req.sid,
-   pure $ ⟨req.sid, none, none, none⟩
+   pure $ ⟨req.sid, none, none, none, []⟩
 }
 
 
@@ -199,7 +210,7 @@ meta def finalize_proof
   match σ.get_ts req.sid "0" with
   | none := do {
     let err := format! "unexpected_unknown_tsid_0: search_id={req.sid}",
-    pure ⟨none, none, none, some err.to_string⟩
+    pure ⟨none, none, none, some err.to_string, []⟩
   }
   | (some ts₀) := do {
     result ← (state_t.lift ∘ io.run_tactic'') $ do {
@@ -215,12 +226,12 @@ meta def finalize_proof
     | (interaction_monad.result.success r s') := do {
       tsid ← record_ts req.sid ts',
       ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts'.fully_qualified >>= postprocess_tactic_state,
-      pure $ ⟨req.sid, tsid, ts_str, none⟩
+      pure $ ⟨req.sid, tsid, ts_str, none, []⟩
     }
     | (interaction_monad.result.exception f p s') := do {
       let msg := (f.get_or_else (λ _, format.of_string "n/a")) (),
       let err := format! "proof_validation_failed: msg={msg}",
-      pure ⟨none, none, none, some err.to_string⟩
+      pure ⟨none, none, none, some err.to_string, []⟩
     }
     end
   }
@@ -234,7 +245,7 @@ meta def handle_conjecture
   match (σ.get_ts req.sid req.tsid) with
   | none := do {
     let err := format! "unknown_id: search_id={req.sid} tactic_state_id={req.tsid}",
-    pure ⟨none, none, none, some err.to_string⟩
+    pure ⟨none, none, none, some err.to_string, []⟩
   }
   | (some ts) := do {
     let conj_str := req.term,
@@ -268,19 +279,41 @@ meta def handle_conjecture
 
         tsid ← record_ts sid ts_narrowed,
         ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts_narrowed.fully_qualified >>= postprocess_tactic_state,
-        pure $ ⟨sid, tsid, ts_str, none⟩
+        pure $ ⟨sid, tsid, ts_str, none, []⟩
     }
     | interaction_monad.result.exception fn pos ts' := do {
       state_t.lift $ do {
         let msg := (fn.get_or_else (λ _, format.of_string "n/a")) (),
         let err := format! "conjecture_set_have_failed: pos={pos} msg={msg}",
-        pure ⟨none, none, none, some err.to_string⟩
+        pure ⟨none, none, none, some err.to_string, []⟩
       }
     }
     end
   }
   end
 }
+
+meta def handle_shrink_proof
+  (req : LeanREPLRequest)
+  : LeanREPL LeanREPLResponse := do {
+  σ ← get,
+  match (σ.get_ts req.sid "0") with
+  | none := do {
+    let err := format! "unknown_id: search_id={req.sid} tactic_state_id={req.tsid}",
+    pure ⟨none, none, none, some err.to_string, []⟩
+  }
+  | (some ts) := do {
+    let steps := req.proof_steps.map (λ ⟨action, tsid⟩, (action, σ.get_ts req.sid tsid)),
+    if steps.any (λ ⟨_, ts⟩, ts.is_none) then do {
+      let err := format! "tsid does not exist",
+      pure ⟨none, none, none, some err.to_string, []⟩
+    } else do {
+      new_steps ← state_t.lift $ shrink_proof ts (steps.map (λ ⟨action, otsid⟩, (action, @option.get _ otsid sorry))),
+      pure ⟨none, none, none, none, new_steps.map (λ ⟨_, action, _⟩, action)⟩
+    }
+  }
+  end
+  }
 
 meta def handle_assume
   (req : LeanREPLRequest)
@@ -289,7 +322,7 @@ meta def handle_assume
   match (σ.get_ts req.sid req.tsid) with
   | none := do {
     let err := format! "unknown_id: search_id={req.sid} tactic_state_id={req.tsid}",
-    pure ⟨none, none, none, some err.to_string⟩
+    pure ⟨none, none, none, some err.to_string, []⟩
   }
   | (some ts) := do {
     let conj_str := req.term,
@@ -323,13 +356,13 @@ meta def handle_assume
 
         tsid ← record_ts sid ts_assumed,
         ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts_assumed.fully_qualified >>= postprocess_tactic_state,
-        pure $ ⟨sid, tsid, ts_str, none⟩
+        pure $ ⟨sid, tsid, ts_str, none, []⟩
     }
     | interaction_monad.result.exception fn pos ts' := do {
       state_t.lift $ do {
         let msg := (fn.get_or_else (λ _, format.of_string "n/a")) (),
         let err := format! "conjecture_assume_have_failed: pos={pos} msg={msg}",
-        pure ⟨none, none, none, some err.to_string⟩
+        pure ⟨none, none, none, some err.to_string, []⟩
       }
     }
     end
@@ -345,7 +378,7 @@ meta def handle_run_tac
   -- Received an unknown search id, return an error.
   | none := do {
     let err := format! "unknown_id: search_id={req.sid} tactic_state_id={req.tsid}",
-    pure ⟨none, none, none, some err.to_string⟩
+    pure ⟨none, none, none, some err.to_string, []⟩
   }
   -- The tactic state was retrieved from the state.
   | (some ts) := do {
@@ -374,7 +407,7 @@ meta def handle_run_tac
         | n := do {
           tsid ← record_ts req.sid ts',
           ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts'.fully_qualified >>= postprocess_tactic_state,
-          pure $ ⟨req.sid, tsid, ts_str, none⟩
+          pure $ ⟨req.sid, tsid, ts_str, none, []⟩
         }
         end
       }
@@ -397,7 +430,7 @@ meta def handle_run_tac
           state_t.lift $ do {
             let msg := (fn.get_or_else (λ _, format.of_string "n/a")) (),
             let err := format! "gen_tac_and_capture_res_failed: pos={pos} msg={msg}",
-            pure ⟨none, none, none, some err.to_string⟩
+            pure ⟨none, none, none, some err.to_string, []⟩
           }
         }
         end
@@ -415,6 +448,7 @@ match req.cmd with
 | "clear_search" := handle_clear_search req
 | "conjecture_set" := handle_conjecture req
 | "conjecture_assume" := handle_assume req
+| "shrink_proof" := handle_shrink_proof req
 | exc := state_t.lift $ io.fail' format! "[fatal] unknown_command: cmd={exc}"
 end
 
