@@ -84,7 +84,7 @@ instance monad_except.of_statet {ε σ} {m : Type → Type} [monad m] [monad_exc
 }
 
 instance monad_except.alt {ε} [inhabited ε] {m : Type → Type} [monad m] [monad_except ε m] : alternative m :=
-{ failure := λ α,throw $ inhabited.default ε
+{ failure := λ α,throw $ arbitrary ε
 , orelse := λ α x y, monad_except.orelse x y
 }
 
