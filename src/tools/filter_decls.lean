@@ -1,6 +1,6 @@
 import util.tactic
+import util.io
 import all
-import tactic
 
 section main
 
@@ -32,10 +32,10 @@ meta def main_aux (names_file : string) (dest : string) : io unit := do {
     (string.split (λ c, c = '\n') <$> buffer.to_string <$> io.fs.read_to_end f)),
 
   let nm_strs := nm_strs.filter (λ x : string, x.length > 0),
-  nms : list (name × list name) ← io.run_tactic' $ nm_strs.mmap parse_decl_nm_and_open_ns,
+  nms : list (name × list name) ← io.run_tactic'' $ nm_strs.mmap parse_decl_nm_and_open_ns,
   dest_handle ← io.mk_file_handle dest io.mode.write,
 
-  io.run_tactic' $ do {
+  io.run_tactic'' $ do {
     env ← tactic.get_env,
     for_ nms $ λ ⟨nm, open_ns⟩, tactic.try $ do {
       decl ← env.get nm,
