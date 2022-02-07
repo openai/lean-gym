@@ -1,7 +1,8 @@
 # lean-gym
 
-This repository lets you interact with Lean through a REPL. It builds and
-depends on [lean-gptf](https://github.com/jesse-michael-han/lean-gptf).
+This repository lets you interact with Lean through a REPL.
+See [Formal Mathematics Statement Curriculum Learning](https://arxiv.org/abs/2202.01344)
+for a presentation of `lean-gym`.
 
 ## Setup
 
