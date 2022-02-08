@@ -56,7 +56,11 @@ meta def strip_unused_haves (ts_final : tactic_state) (steps : list (tactic_stat
 }
 
 meta def rerun_proof : tactic_state → list string → io (list (tactic_state × string × tactic_state))
-| ts1 [] := pure []
+| ts1 [] := do {
+  -- confirm that the proof has finished
+  io.run_tac ts1 tactic.done,
+  pure []
+}
 | ts1 (action::actions) := do 
   result_with_string ← io.run_tac ts1 (get_tac_and_capture_result action 5000),
   match result_with_string with
