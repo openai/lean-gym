@@ -329,7 +329,7 @@ meta def handle_shrink_proof
     pure ⟨none, none, none, some err.to_string, []⟩
   }
   | (some ts_final) := do {
-    state_t.lift $ io.run_tac ts_final (do tactic.trace_state, gs ← tactic.get_goals, tactic.trace gs.length, tactic.done),
+    state_t.lift $ io.run_tac ts_final tactic.done,
     steps ← state_t.lift $ collect_proof_steps σ req.sid req.tsid,
     new_steps ← state_t.lift (shrink_proof steps),
     pure ⟨none, none, none, none, new_steps.map (λ ⟨_, action, _⟩, action)⟩

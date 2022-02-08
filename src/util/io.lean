@@ -28,7 +28,6 @@ meta def run_tactic'' {α} (tac :tactic α) : io α := do {
   }
 }
 
-
 meta def fail' {α} (fmt : format) : io α := io.fail $ format.to_string fmt
 
 meta def put_str_ln' : Π (fmt : format), io unit := io.put_str_ln ∘ format.to_string
