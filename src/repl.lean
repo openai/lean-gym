@@ -321,7 +321,6 @@ meta def collect_proof_steps (σ : LeanREPLState) (sid tsid : string) : io (list
 meta def handle_shrink_proof
   (req : LeanREPLRequest)
   : LeanREPL LeanREPLResponse := do {
-  state_t.lift $ io.print_ln "handle_shrink_proof",
   σ ← get,
   match (σ.get_ts req.sid req.tsid) with
   | none := do {
