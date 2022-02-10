@@ -55,12 +55,16 @@ meta def strip_unused_haves (ts_final : tactic_state) (steps : list (tactic_stat
   if resume_idx = steps.length then io.fail "weird `have`, possible swap" else pure (steps.take bad_idx ++ steps.drop resume_idx)
 }
 
-meta def rerun_proof : tactic_state → list string → io (list (tactic_state × string × tactic_state))
-| ts1 [] := do {
+meta def rerun_proof (ts_orig : tactic_state) : tactic_state → list string → io (list (tactic_state × string × tactic_state))
+| ts1 [] := io.run_tac ts_orig (do {
   -- confirm that the proof has finished
-  io.run_tac ts1 tactic.done,
+  [g] ← tactic.get_goals,
+  tgt ← tactic.infer_type g,
+  tactic.write ts1,
+  pf ← tactic.get_assignment g >>= tactic.instantiate_mvars,
+  validate_proof tgt pf <|> (tactic.trace "failed to validate" >> tactic.fail "failed to validate"),
   pure []
-}
+})
 | ts1 (action::actions) := do 
   result_with_string ← io.run_tac ts1 (get_tac_and_capture_result action 5000),
   match result_with_string with
@@ -81,7 +85,7 @@ meta def shrink_proof : list (tactic_state × string × tactic_state) → io (li
   let ts_start := step.fst,
   if success then do {
     io.catch (do {
-      steps ← rerun_proof ts_start $ fewer_steps.map (λ ⟨_, action, _⟩, action),
+      steps ← rerun_proof ts_start ts_start $ fewer_steps.map (λ ⟨_, action, _⟩, action),
       shrink_proof steps
     }) (λ e, pure steps)
   }
