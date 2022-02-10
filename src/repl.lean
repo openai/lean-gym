@@ -33,7 +33,7 @@ meta structure LeanREPLResponse : Type :=
 (tsid : option string)
 (tactic_state : option string)
 (error: option string)
-(proof_steps : list string)
+(proof_steps : list (string × string))
 
 
 meta structure parent : Type :=
@@ -136,7 +136,7 @@ meta def LeanREPLResponse.to_json: LeanREPLResponse → json
         | none := json.null
         | some err := json.of_string err
         end⟩,
-      ⟨"proof_steps", json.array (steps.map json.of_string)⟩
+      ⟨"proof_steps", json.array (steps.map $ λ ⟨ts_str, action⟩, json.array [json.of_string ts_str, json.of_string action])⟩
     ]
 
 meta instance : has_to_format LeanREPLResponse :=
@@ -331,7 +331,11 @@ meta def handle_shrink_proof
     state_t.lift $ io.run_tac ts_final tactic.done,
     steps ← state_t.lift $ collect_proof_steps σ req.sid req.tsid,
     new_steps ← state_t.lift (shrink_proof steps),
-    pure ⟨none, none, none, none, new_steps.map (λ ⟨_, action, _⟩, action)⟩
+    new_steps ← state_t.lift $ new_steps.mmap $ λ ⟨ts1, action, _⟩, do {
+      ts1_str ← io.run_tactic'' $ ts1.fully_qualified >>= postprocess_tactic_state,
+      pure (ts1_str, action)
+    },
+    pure ⟨none, none, none, none, new_steps⟩
   }
   end
   }
