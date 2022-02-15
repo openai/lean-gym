@@ -14,20 +14,18 @@ meta def try_finish_tactics : list (tactic unit × string) := [
   (`[refl], "refl"),
   (`[exact dec_trivia], "exact dec_trivial"),
   (`[assumption], "assumption"),
-  (`[simp], "simp"),    
-  (`[dsimp], "dsimp"),    
-  (`[norm_num], "norm_num"),    
+  (`[simp], "simp"),
+  (`[dsimp], "dsimp"),
+  (`[norm_num], "norm_num"),
   (`[ring], "ring"),
-  (`[simp [*]], "simp [*]"),    
+  (`[simp [*]], "simp [*]"),
   (`[linarith], "linarith")
 ]
-  
-meta def try_finish (ts : tactic_state) (timeout : nat := 1000) : io (option (string × tactic_state)) := do
-  try_finish_tactics.mfirst $ λ ⟨tac, tacString⟩, do {
-    io.run_tac ts $ do {
-      gs1 ← tactic.get_goals,
-      tactic.try_for_time timeout $ tactic.try_for 200000 (tactic.solve1 tac),
-      ts2 ← get,
-      pure (tacString, ts2)
-    }
-  }
+
+meta def try_finish (ts : tactic_state) (timeout : nat := 1000) : io (option (string × tactic_state)) :=
+  (try_finish_tactics.mfirst $ λ ⟨tac, tacString⟩, io.run_tac ts $ do {
+    gs1 ← tactic.get_goals,
+    tactic.try_for_time timeout $ tactic.try_for 200000 (tactic.solve1 tac),
+    ts2 ← get,
+    pure (tacString, ts2)
+  }) <|> pure none
