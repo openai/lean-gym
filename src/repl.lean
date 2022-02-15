@@ -13,6 +13,7 @@ import util.io
 import util.tactic
 import basic.table
 import tools.shrink_proof
+import tools.try_finish
 
 section main
 
@@ -88,6 +89,11 @@ meta instance : has_from_json LeanREPLRequest := ⟨λ msg, match msg with
       | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
       end
     | "shrink_proof" := match json.array args with
+      | (json.array [json.of_string sid, json.of_string tsid]) := do
+        pure ⟨cmd, sid, tsid , "", "", "", ""⟩
+      | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
+      end      
+    | "try_finish" := match json.array args with
       | (json.array [json.of_string sid, json.of_string tsid]) := do
         pure ⟨cmd, sid, tsid , "", "", "", ""⟩
       | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
@@ -340,6 +346,32 @@ meta def handle_shrink_proof
   end
   }
 
+meta def handle_try_finish
+  (req : LeanREPLRequest)
+  : LeanREPL LeanREPLResponse := do {
+  σ ← get,
+  match (σ.get_ts req.sid req.tsid) with
+  | none := do {
+    let err := format! "unknown_id: search_id={req.sid} tactic_state_id={req.tsid}",
+    pure ⟨none, none, none, some err.to_string, []⟩
+  }
+  | (some ts) := do {
+    possible_action ← state_t.lift $ try_finish ts,
+    match possible_action with
+    | none := do {
+      let err := format! "try_finish_failed: search_id={req.sid} tactic_state_id={req.tsid}",
+      pure ⟨none, none, none, some err.to_string, []⟩
+    }
+    | some (action, ts') := do {
+      tsid ← record_ts req.sid ts' (some ⟨req.tsid, action⟩),
+      ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts'.fully_qualified >>= postprocess_tactic_state,
+      pure $ ⟨req.sid, tsid, ts_str, none, [(action, ts_str)]⟩
+    }
+    end
+  }
+  end
+  }
+
 meta def handle_assume
   (req : LeanREPLRequest)
   : LeanREPL LeanREPLResponse := do {
@@ -474,6 +506,7 @@ match req.cmd with
 | "conjecture_set" := handle_conjecture req
 | "conjecture_assume" := handle_assume req
 | "shrink_proof" := handle_shrink_proof req
+| "try_finish" := handle_try_finish req
 | exc := state_t.lift $ io.fail' format! "[fatal] unknown_command: cmd={exc}"
 end
 

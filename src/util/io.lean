@@ -21,7 +21,7 @@ meta def run_tactic'' {α} (tac :tactic α) : io α := do {
     | (exception m_fmt _ _) := do {
       let fmt_msg := (m_fmt.get_or_else (λ _, format!"n/a")) (),
       let msg := format!"[fatal] {fmt_msg}",
-      tactic.trace msg,
+      -- tactic.trace msg,
       tactic.fail msg
     }
     end
