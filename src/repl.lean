@@ -363,14 +363,28 @@ meta def handle_try_finish
       pure ⟨none, none, none, some err.to_string, []⟩
     }
     | some (action, ts') := do {
+      -- TODO: refactor so that finalizing a proof is a separate top-level call
+      goals ← state_t.lift $ io.run_tac ts' tactic.get_goals,
+      if goals.empty then do {
+        state_t.lift $ io.print_ln "FINISH",
+        r ← finalize_proof { req with tac := action } ts',
+        match r.error with
+        | none := do {
+          ts_str ← state_t.lift $ io.run_tactic'' $ postprocess_tactic_state ts',
+          pure { r with proof_steps := [(action, ts_str)] }
+        }
+        | some err := pure r
+        end
+      } else do {
       tsid ← record_ts req.sid ts' (some ⟨req.tsid, action⟩),
       ts_str ← (state_t.lift ∘ io.run_tactic'') $ postprocess_tactic_state ts',
       pure $ ⟨req.sid, tsid, ts_str, none, [(action, ts_str)]⟩
     }
+    }
     end
   }
   end
-  }
+}
 
 meta def handle_assume
   (req : LeanREPLRequest)
