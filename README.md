@@ -51,10 +51,8 @@ $ lean --run src/repl.lean
 
 ## Declaration names
 
-Declaration names and open namespaces as recorded by
-[lean_proof_recording](https://github.com/jasonrute/lean-proof-recording-public)
-are available in the `data/` directory to be used with the `init_search`
-command.
+Declaration names and open namespaces are available in the `data/` directory to be used with the
+`init_search` command.
 
 ## Notes
 
