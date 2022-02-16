@@ -50,10 +50,10 @@ namespace LeanREPLState
 meta def insert_ts (σ : LeanREPLState) (sid) (tsid) (ts) (parent : option parent): LeanREPLState :=
   ⟨dict.insert sid (dict.insert tsid (ts, parent) (σ.1.get_default (dict.empty) sid)) σ.1, σ.2⟩
 
-meta def get_ts_parents (σ : LeanREPLState) (sid) (tsid) : option (tactic_state × option parent) := 
+meta def get_ts_parents (σ : LeanREPLState) (sid) (tsid) : option (tactic_state × option parent) :=
   (σ.1.get_default (dict.empty) sid).get tsid
 
-meta def get_ts (σ : LeanREPLState) (sid) (tsid) : option tactic_state := 
+meta def get_ts (σ : LeanREPLState) (sid) (tsid) : option tactic_state :=
   option.map prod.fst $ σ.get_ts_parents sid tsid
 
 meta def get_next_tsid (σ : LeanREPLState) (sid) : string := (format! "{(σ.1.get_default (dict.empty) sid).size}").to_string
@@ -92,12 +92,12 @@ meta instance : has_from_json LeanREPLRequest := ⟨λ msg, match msg with
       | (json.array [json.of_string sid, json.of_string tsid]) := do
         pure ⟨cmd, sid, tsid , "", "", "", ""⟩
       | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
-      end      
+      end
     | "try_finish" := match json.array args with
       | (json.array [json.of_string sid, json.of_string tsid]) := do
         pure ⟨cmd, sid, tsid , "", "", "", ""⟩
       | exc := tactic.fail format!"request_parsing_error: cmd={cmd} data={exc}"
-      end      
+      end
     | exc := tactic.fail format!"request_parsing_error: data={exc}"
     end
   | exc := tactic.fail format!"request_parsing_error: data={exc}"
@@ -195,7 +195,7 @@ meta def handle_init_search
      let sid := σ.get_next_sid,
      modify $ λ σ, σ.incr_next_sid,
      tsid ← record_ts sid ts none,
-     ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts.fully_qualified >>= postprocess_tactic_state,
+     ts_str ← (state_t.lift ∘ io.run_tactic'') $ postprocess_tactic_state ts,
      pure $ ⟨sid, tsid, ts_str, none, []⟩
    }
    end
@@ -234,7 +234,7 @@ meta def finalize_proof
     match result with
     | (interaction_monad.result.success r s') := do {
       tsid ← record_ts req.sid ts' (some ⟨req.tsid, req.tac⟩),
-      ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts'.fully_qualified >>= postprocess_tactic_state,
+      ts_str ← (state_t.lift ∘ io.run_tactic'') $ postprocess_tactic_state ts',
       pure $ ⟨req.sid, tsid, ts_str, none, []⟩
     }
     | (interaction_monad.result.exception f p s') := do {
@@ -287,7 +287,7 @@ meta def handle_conjecture
         modify $ λ σ, σ.incr_next_sid,
 
         tsid ← record_ts sid ts_narrowed none,
-        ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts_narrowed.fully_qualified >>= postprocess_tactic_state,
+        ts_str ← (state_t.lift ∘ io.run_tactic'') $ postprocess_tactic_state ts_narrowed,
         pure $ ⟨sid, tsid, ts_str, none, []⟩
     }
     | interaction_monad.result.exception fn pos ts' := do {
@@ -306,16 +306,16 @@ meta def collect_proof_steps_aux (σ : LeanREPLState) (sid : string) : Π (tsid 
 | tsid2 := do
   match σ.get_ts_parents sid tsid2 with
   | none := io.fail "collect_proof_steps: invalid tsid"
-  | (some ⟨ts2, parent⟩) := 
+  | (some ⟨ts2, parent⟩) :=
     match parent with
     | none := if tsid2 = "0" then pure [] else io.fail "no parent"
     | (some ⟨tsid1, action⟩) :=
-      match σ.get_ts sid tsid1 with 
-      | none := io.fail "parent doesn't exist"      
+      match σ.get_ts sid tsid1 with
+      | none := io.fail "parent doesn't exist"
       | (some ts1) := do {
         rest ← collect_proof_steps_aux tsid1,
         pure (⟨ts1, action, ts2⟩ :: rest)
-      } 
+      }
       end
     end
   end
@@ -338,7 +338,7 @@ meta def handle_shrink_proof
     steps ← state_t.lift $ collect_proof_steps σ req.sid req.tsid,
     new_steps ← state_t.lift (shrink_proof steps),
     new_steps ← state_t.lift $ new_steps.mmap $ λ ⟨ts1, action, _⟩, do {
-      ts1_str ← io.run_tactic'' $ ts1.fully_qualified >>= postprocess_tactic_state,
+      ts1_str ← io.run_tactic'' $ postprocess_tactic_state ts1,
       pure (ts1_str, action)
     },
     pure ⟨none, none, none, none, new_steps⟩
@@ -364,7 +364,7 @@ meta def handle_try_finish
     }
     | some (action, ts') := do {
       tsid ← record_ts req.sid ts' (some ⟨req.tsid, action⟩),
-      ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts'.fully_qualified >>= postprocess_tactic_state,
+      ts_str ← (state_t.lift ∘ io.run_tactic'') $ postprocess_tactic_state ts',
       pure $ ⟨req.sid, tsid, ts_str, none, [(action, ts_str)]⟩
     }
     end
@@ -412,7 +412,7 @@ meta def handle_assume
         modify $ λ σ, σ.incr_next_sid,
 
         tsid ← record_ts sid ts_assumed (some ⟨req.tsid, req.tac⟩),
-        ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts_assumed.fully_qualified >>= postprocess_tactic_state,
+        ts_str ← (state_t.lift ∘ io.run_tactic'') $ postprocess_tactic_state ts_assumed,
         pure $ ⟨sid, tsid, ts_str, none, []⟩
     }
     | interaction_monad.result.exception fn pos ts' := do {
@@ -463,7 +463,7 @@ meta def handle_run_tac
         -- There are remaining subgoals, return the updated tactic state.
         | n := do {
           tsid ← record_ts req.sid ts' (some ⟨req.tsid, req.tac⟩),
-          ts_str ← (state_t.lift ∘ io.run_tactic'') $ ts'.fully_qualified >>= postprocess_tactic_state,
+          ts_str ← (state_t.lift ∘ io.run_tactic'') $ postprocess_tactic_state ts',
           pure $ ⟨req.sid, tsid, ts_str, none, []⟩
         }
         end
