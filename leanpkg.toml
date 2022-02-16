@@ -6,3 +6,4 @@ path = "src"
 
 [dependencies]
 mathlib = { git = "https://github.com/leanprover-community/mathlib", rev = "30a731ca565b92955e40274652f4c2b6f4db79f4" }
+minif2f = { git = "https://github.com/openai/miniF2F.git", rev = "9b00e8ba0b52836177fb3a6a0d1a5a945144bb61" }
