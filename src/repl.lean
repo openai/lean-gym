@@ -366,7 +366,6 @@ meta def handle_try_finish
       -- TODO: refactor so that finalizing a proof is a separate top-level call
       goals ← state_t.lift $ io.run_tac ts' tactic.get_goals,
       if goals.empty then do {
-        state_t.lift $ io.print_ln "FINISH",
         r ← finalize_proof { req with tac := action } ts',
         match r.error with
         | none := do {
