@@ -28,12 +28,26 @@ meta def run_tactic'' {α} (tac :tactic α) : io α := do {
   }
 }
 
+meta def run_tactic''' {α} (tac :tactic α) : io α := do {
+  io.run_tactic $ do {
+    result ← tactic.capture tac,
+    match result with
+    | (success val _) := pure val
+    | (exception m_fmt _ _) := do {
+      let fmt_msg := (m_fmt.get_or_else (λ _, format!"n/a")) (),
+      let msg := format!"[fatal] {fmt_msg}",
+      tactic.fail msg
+    }
+    end
+  }
+}
+
 meta def fail' {α} (fmt : format) : io α := io.fail $ format.to_string fmt
 
 meta def put_str_ln' : Π (fmt : format), io unit := io.put_str_ln ∘ format.to_string
 
 meta def run_tac {α : Type} (ts : tactic_state) (tac : tactic α) : io α :=
-  run_tactic'' (do tactic.write ts, tac)
+  run_tactic''' (do tactic.write ts, tac)
 
 end io
 end io
