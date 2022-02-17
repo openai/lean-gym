@@ -12,7 +12,7 @@ import util.tactic
 meta def try_finish_tactics : list (tactic unit × string) := [
   (`[trivial], "trivial"),
   (`[refl], "refl"),
-  (`[exact dec_trivia], "exact dec_trivial"),
+  (`[exact dec_trivial], "exact dec_trivial"),
   (`[assumption], "assumption"),
   (`[simp], "simp"),
   (`[dsimp], "dsimp"),
