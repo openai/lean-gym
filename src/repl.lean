@@ -441,6 +441,14 @@ meta def handle_assume
   end
 }
 
+meta def handle_parse_failed
+  (req : LeanREPLRequest)
+  : LeanREPL LeanREPLResponse := do {
+    -- A little hack that use `req` to pass error message
+    let err := format! "parse_failed: data={req.sid}",
+    pure ⟨none, none, none, some err.to_string, []⟩
+  }
+
 meta def handle_run_tac
   (req : LeanREPLRequest)
   : LeanREPL LeanREPLResponse := do {
@@ -521,6 +529,7 @@ match req.cmd with
 | "conjecture_assume" := handle_assume req
 | "shrink_proof" := handle_shrink_proof req
 | "try_finish" := handle_try_finish req
+| "parse_failed" := handle_parse_failed req
 | exc := state_t.lift $ io.fail' format! "[fatal] unknown_command: cmd={exc}"
 end
 
@@ -528,7 +537,7 @@ end
 meta def parse_request (msg : string) : io LeanREPLRequest := do {
   match json.parse msg with
   | (some json_msg) := io.run_tactic'' $ has_from_json.from_json json_msg
-  | none := io.fail' format! "[fatal] parse_failed: data={msg}"
+  | none := pure ⟨"parse_failed", msg, "", "", "", "", ""⟩
   end
 }
 
